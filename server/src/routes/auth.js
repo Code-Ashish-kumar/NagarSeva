@@ -102,6 +102,7 @@ async function trySendEmail(email, otp, type) {
     await sendOtpEmail(email, otp, type);
   } catch (err) {
     console.warn(`[WARN] Email not sent to ${email}: ${err.message}`);
+    console.warn(`[DEV ONLY] OTP for ${email}: ${otp}`);
     console.warn('[WARN] Using dev_otp in response instead. Set SMTP credentials to send real emails.');
   }
 }
