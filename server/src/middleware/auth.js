@@ -5,17 +5,16 @@ const jwt = require('jsonwebtoken');
  * Attaches decoded user payload to req.user.
  */
 const auth = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
+  // Look for 'token' to match what you set in your login controller
+  const token = req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!token) {
     return res.status(401).json({
       error: 'UNAUTHORIZED',
-      message: 'Access token missing or malformed',
+      message: 'Token not found. Please log in.'
     });
   }
-
-  const token = authHeader.split(' ')[1];
-
+  
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;   // { id, email, role, iat, exp }
@@ -24,12 +23,12 @@ const auth = (req, res, next) => {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({
         error: 'TOKEN_EXPIRED',
-        message: 'Access token expired — please refresh',
+        message: 'Access token expired — please log in again.',
       });
     }
     return res.status(401).json({
       error: 'INVALID_TOKEN',
-      message: 'Access token is invalid',
+      message: 'Access token is invalid.',
     });
   }
 };

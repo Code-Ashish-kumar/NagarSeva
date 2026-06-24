@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import { register } from '../services/Operations/authAPI';
 
 function getStrength(password) {
   let score = 0;
@@ -54,16 +54,16 @@ export default function Register() {
     setLoading(true);
     setServerErr('');
     try {
-      await api.post('/auth/register', {
+      await register({
         name: form.name.trim(), email: form.email.toLowerCase().trim(), password: form.password,
       });
       navigate('/verify-email', { state: { email: form.email.toLowerCase().trim() } });
     } catch (err) {
-      if (err.response?.data?.error === 'EMAIL_UNVERIFIED') {
+      if (err.data?.error === 'EMAIL_UNVERIFIED') {
         navigate('/verify-email', { state: { email: form.email.toLowerCase().trim(), fromLogin: true } });
         return;
       }
-      setServerErr(err.response?.data?.message || 'Registration failed. Please try again.');
+      setServerErr(err.data?.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
