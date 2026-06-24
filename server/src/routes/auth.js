@@ -92,6 +92,20 @@ async function createOtp(email, type) {
   return code;
 }
 
+/**
+ * Attempt to send an OTP email — never throws.
+ * In development, a missing/broken SMTP config is logged as a warning
+ * and the caller returns dev_otp in the response body instead.
+ */
+async function trySendEmail(email, otp, type) {
+  try {
+    await sendOtpEmail(email, otp, type);
+  } catch (err) {
+    console.warn(`[WARN] Email not sent to ${email}: ${err.message}`);
+    console.warn('[WARN] Using dev_otp in response instead. Set SMTP credentials to send real emails.');
+  }
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 /**
@@ -137,9 +151,9 @@ router.post(
     );
     const newUser = result.rows[0];
 
-    // Generate & send OTP
+    // Generate & send OTP (email failure never crashes the endpoint)
     const otp = await createOtp(email, 'VERIFY_EMAIL');
-    await sendOtpEmail(email, otp, 'VERIFY_EMAIL');
+    await trySendEmail(email, otp, 'VERIFY_EMAIL');
 
     res.status(201).json({
       message: 'Account created. Check your email for the verification code.',
@@ -243,7 +257,7 @@ router.post(
     }
 
     const otp = await createOtp(email, 'VERIFY_EMAIL');
-    await sendOtpEmail(email, otp, 'VERIFY_EMAIL');
+    await trySendEmail(email, otp, 'VERIFY_EMAIL');
 
     res.status(200).json({
       message: 'A new verification code has been sent to your email.',

@@ -132,3 +132,4 @@ src/pages/MapView.jsx            ← Placeholder (Day 2: real map)
 src/styles/globals.css           ← Design system (CSS variables)
 src/styles/auth.css              ← Auth page styles
 ```
+

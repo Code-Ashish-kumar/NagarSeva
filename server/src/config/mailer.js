@@ -3,12 +3,21 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
   host:   process.env.SMTP_HOST,
   port:   Number(process.env.SMTP_PORT) || 587,
-  secure: false,
+  secure: Number(process.env.SMTP_PORT) === 465,  // true only for port 465 (implicit TLS)
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    // Mailtrap sandbox uses STARTTLS; don't reject self-signed certs in dev
+    rejectUnauthorized: process.env.NODE_ENV === 'production',
+  },
 });
+
+// Verify transporter connection on startup (non-blocking)
+transporter.verify()
+  .then(() => console.log('✅ SMTP connection verified — emails will be sent'))
+  .catch((err) => console.warn(`⚠️  SMTP connection failed: ${err.message}\n   Emails won't be delivered. Check SMTP_HOST/PORT/USER/PASS in .env`));
 
 /**
  * Send a 6-digit OTP to the given email.
