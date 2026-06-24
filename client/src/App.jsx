@@ -1,37 +1,76 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/common/ProtectedRoute';
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { setAuth, clearAuth } from "./slices/authSlice";
+import { checkAuth } from "./services/Operations/authAPI";
 
-import Login       from './pages/Login';
-import Register    from './pages/Register';
-import VerifyEmail from './pages/VerifyEmail';
-import MapView     from './pages/MapView';
+import ProtectedRoute from "./components/common/ProtectedRoute";
+import RoleRedirect from "./components/common/RoleRedirect";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import VerifyEmail from "./pages/VerifyEmail";
+import CitizenDashboard from "./pages/CitizenDashboard";
+import FieldWorkerDashboard from "./pages/FieldWorkerDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 export default function App() {
+  const dispatch = useDispatch();
+
+  // On mount: check if user is authenticated via stored token
+  useEffect(() => {
+    async function verifyUser() {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        dispatch(clearAuth());
+        return;
+      }
+      const data = await checkAuth();
+      if (data && data.user) {
+        dispatch(setAuth(data.user));
+      } else {
+        localStorage.clear();
+        dispatch(clearAuth());
+      }
+    }
+    verifyUser();
+  }, [dispatch]);
+
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          {/* Public auth routes */}
-          <Route path="/login"        element={<Login />} />
-          <Route path="/register"     element={<Register />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
+    <Routes>
+      {/* Public auth routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
-          {/* Protected routes */}
-          <Route
-            path="/map"
-            element={
-              <ProtectedRoute>
-                <MapView />
-              </ProtectedRoute>
-            }
-          />
+      {/* Role-based protected dashboards */}
+      <Route
+        path="/citizen"
+        element={
+          <ProtectedRoute roles={["CITIZEN"]}>
+            <CitizenDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/field-worker"
+        element={
+          <ProtectedRoute roles={["FIELD_WORKER"]}>
+            <FieldWorkerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute roles={["ADMIN", "SUPER_ADMIN"]}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
 
-          {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/map" replace />} />
-          <Route path="*" element={<Navigate to="/"   replace />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+      {/* Default: redirect to correct dashboard based on role */}
+      <Route path="/" element={<RoleRedirect />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

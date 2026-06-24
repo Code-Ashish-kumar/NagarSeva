@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
+import { useDispatch } from 'react-redux';
+import { setAuth } from '../slices/authSlice';
+import { login as loginAPI } from '../services/Operations/authAPI';
 
 const FEATURES = [
   { icon: '📍', title: 'Geo-tagged Reporting',  desc: 'Pin-drop precision for every issue' },
@@ -12,7 +13,7 @@ const FEATURES = [
 export default function Login() {
   const navigate   = useNavigate();
   const location   = useLocation();
-  const { login }  = useAuth();
+  const dispatch   = useDispatch();
 
   const [form, setForm]           = useState({ email: '', password: '' });
   const [showPwd, setShowPwd]     = useState(false);
@@ -20,7 +21,7 @@ export default function Login() {
   const [errors, setErrors]       = useState({});
   const [serverErr, setServerErr] = useState('');
 
-  const from = location.state?.from?.pathname || '/map';
+  const from = location.state?.from?.pathname || '/';
 
   function validate() {
     const e = {};
@@ -45,18 +46,19 @@ export default function Login() {
     setLoading(true);
     setServerErr('');
     try {
-      const res = await api.post('/auth/login', {
-        email:    form.email.toLowerCase().trim(),
-        password: form.password,
-      });
-      login(res.data);
+      const data = await loginAPI(form.email.toLowerCase().trim(), form.password);
+      // Store tokens in localStorage
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      // Update Redux state
+      dispatch(setAuth(data.user));
       navigate(from, { replace: true });
     } catch (err) {
-      if (err.response?.data?.error === 'EMAIL_UNVERIFIED') {
+      if (err.data?.error === 'EMAIL_UNVERIFIED') {
         navigate('/verify-email', { state: { email: form.email, fromLogin: true } });
         return;
       }
-      setServerErr(err.response?.data?.message || 'Login failed. Please try again.');
+      setServerErr(err.data?.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }

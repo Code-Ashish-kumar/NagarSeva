@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import api from '../api/axios';
-import { useAuth } from '../context/AuthContext';
+import { useDispatch } from 'react-redux';
+import { setAuth } from '../slices/authSlice';
+import { verifyEmail as verifyEmailAPI, resendOtp } from '../services/Operations/authAPI';
 
 const OTP_LENGTH      = 6;
 const RESEND_COOLDOWN = 60;
 
 export default function VerifyEmail() {
-  const { login }      = useAuth();
-  const navigate       = useNavigate();
-  const location       = useLocation();
+  const dispatch     = useDispatch();
+  const navigate     = useNavigate();
+  const location     = useLocation();
 
   const emailFromState = location.state?.email || '';
   const fromLogin      = location.state?.fromLogin || false;
@@ -31,7 +32,7 @@ export default function VerifyEmail() {
   useEffect(() => {
     if (fromLogin && email && !hasSentRef.current) {
       hasSentRef.current = true;
-      api.post('/auth/resend-otp', { email }).catch(() => {});
+      resendOtp(email).catch(() => {});
     }
   }, [fromLogin, email]);
 
@@ -83,18 +84,22 @@ export default function VerifyEmail() {
     setLoading(true);
     setServerErr('');
     try {
-      const res = await api.post('/auth/verify-email', { email, code });
-      login(res.data);
-      navigate('/map', { replace: true });
+      const data = await verifyEmailAPI(email, code);
+      // Store tokens
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
+      // Update Redux state
+      dispatch(setAuth(data.user));
+      navigate('/', { replace: true });
     } catch (err) {
       setDigitsError(true);
       setDigits(Array(OTP_LENGTH).fill(''));
       inputsRef.current[0]?.focus();
-      setServerErr(err.response?.data?.message || 'Invalid or expired code. Try again.');
+      setServerErr(err.data?.message || 'Invalid or expired code. Try again.');
     } finally {
       setLoading(false);
     }
-  }, [email, login, navigate]);
+  }, [email, dispatch, navigate]);
 
   function handleManualSubmit(e) {
     e.preventDefault();
@@ -107,14 +112,14 @@ export default function VerifyEmail() {
     setResending(true);
     setServerErr('');
     try {
-      await api.post('/auth/resend-otp', { email });
+      await resendOtp(email);
       setSuccessMsg('A new code has been sent to your email.');
       setDigits(Array(OTP_LENGTH).fill(''));
       inputsRef.current[0]?.focus();
       resetTimer();
       setTimeout(() => setSuccessMsg(''), 5000);
     } catch (err) {
-      setServerErr(err.response?.data?.message || 'Failed to resend. Try again.');
+      setServerErr(err.data?.message || 'Failed to resend. Try again.');
     } finally {
       setResending(false);
     }

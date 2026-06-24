@@ -27,7 +27,7 @@ const registerSchema = Joi.object({
   name:     Joi.string().min(2).max(100).trim().required(),
   email:    Joi.string().email().lowercase().trim().required(),
   password: Joi.string().min(8).max(72).required(),
-  role:     Joi.string().valid('CITIZEN').default('CITIZEN'),   // citizens only self-register
+  // Only citizens self-register; admin & field workers are inserted manually
 });
 
 const loginSchema = Joi.object({
@@ -120,7 +120,8 @@ router.post(
     const { error, value } = registerSchema.validate(req.body);
     if (error) throw Object.assign(error, { isJoi: true });
 
-    const { name, email, password, role } = value;
+    const { name, email, password } = value;
+    const role = 'CITIZEN'; // Only citizens self-register
 
     // Check if email already taken
     const existing = await pool.query('SELECT id, is_verified FROM users WHERE email = $1', [email]);
@@ -371,7 +372,7 @@ router.get(
   auth,
   asyncHandler(async (req, res) => {
     const result = await pool.query(
-      'SELECT id, name, email, role, ward, is_verified, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, role, is_verified, department, assigned_zone, employee_id, work_contact, privilege_level, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
 
