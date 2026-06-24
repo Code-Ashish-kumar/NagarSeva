@@ -26,6 +26,15 @@ export default function VerifyEmail() {
   const inputsRef = useRef([]);
   const timerRef  = useRef(null);
 
+  // ── Auto-send OTP when arriving from register redirect (409 EMAIL_UNVERIFIED) ──
+  const hasSentRef = useRef(false);
+  useEffect(() => {
+    if (fromLogin && email && !hasSentRef.current) {
+      hasSentRef.current = true;
+      api.post('/auth/resend-otp', { email }).catch(() => {});
+    }
+  }, [fromLogin, email]);
+
   // ── Countdown ──────────────────────────────────────────────────────────
   useEffect(() => {
     timerRef.current = setInterval(() => {

@@ -60,7 +60,7 @@ export default function Register() {
       navigate('/verify-email', { state: { email: form.email.toLowerCase().trim() } });
     } catch (err) {
       if (err.response?.data?.error === 'EMAIL_UNVERIFIED') {
-        navigate('/verify-email', { state: { email: form.email.toLowerCase().trim() } });
+        navigate('/verify-email', { state: { email: form.email.toLowerCase().trim(), fromLogin: true } });
         return;
       }
       setServerErr(err.response?.data?.message || 'Registration failed. Please try again.');
