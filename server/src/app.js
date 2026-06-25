@@ -4,7 +4,8 @@ const helmet       = require('helmet');
 const cookieParser = require('cookie-parser');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
-const authRoutes   = require('./routes/auth');
+const authRoutes       = require('./routes/auth');
+const complaintsRoutes = require('./routes/complaints');
 
 const app = express();
 
@@ -14,15 +15,16 @@ app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,  // Required for cookies to be sent cross-origin
 }));
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(cookieParser()); // Parse req.cookies — must come before routes
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 app.use('/api', apiLimiter);
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/auth', authRoutes);
+app.use('/api/auth',       authRoutes);
+app.use('/api/complaints', complaintsRoutes);
 
 // Health check — useful for Railway/Render deploy
 app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));

@@ -1,0 +1,22 @@
+/**
+ * src/routes/complaints.js
+ *
+ * POST /api/complaints/analyze  — AI image analysis (auth required)
+ */
+const express = require('express');
+const auth = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimiter');
+const { analyze } = require('../controller/complaints');
+
+const router = express.Router();
+
+// All complaint routes require a valid JWT (citizen must be logged in)
+router.use(auth);
+
+/**
+ * POST /api/complaints/analyze
+ * Analyse a complaint image with Gemini and return structured data.
+ */
+router.post('/analyze', apiLimiter, analyze);
+
+module.exports = router;

@@ -12,6 +12,8 @@ import VerifyEmail from "./pages/VerifyEmail";
 import CitizenDashboard from "./pages/CitizenDashboard";
 import FieldWorkerDashboard from "./pages/FieldWorkerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import ReportWizard from "./pages/ReportWizard";
+
 
 export default function App() {
   const dispatch = useDispatch();
@@ -43,6 +45,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={["CITIZEN"]}>
             <CitizenDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/citizen/report"
+        element={
+          <ProtectedRoute roles={["CITIZEN"]}>
+            <ReportWizard />
           </ProtectedRoute>
         }
       />
