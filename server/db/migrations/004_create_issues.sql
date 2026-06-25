@@ -1,4 +1,4 @@
-CREATE TABLE issues (
+CREATE TABLE IF NOT EXISTS issues (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     short_id      VARCHAR(20) UNIQUE NOT NULL,  -- e.g., "ISS-2025-0042"
     reporter_id   UUID REFERENCES users(id),
@@ -7,7 +7,7 @@ CREATE TABLE issues (
                     'POTHOLE', 'STREETLIGHT', 'SEWAGE', 'GARBAGE', 'WATER_SUPPLY', 
                     'ROAD_DAMAGE', 'ENCROACHMENT', 'STRAY_ANIMALS', 'DEAD_ANIMAL', 
                     'PUBLIC_TOILET', 'DRAIN_BLOCKAGE', 'FALLEN_TREE', 'ABANDONED_VEHICLE', 
-                    'AIR_POLLUTION', 'OTHER'
+                    'AIR_POLLUTION', 'OTHER'  
                   )),
     description   TEXT,
     location      GEOGRAPHY(POINT, 4326) NOT NULL,  -- PostGIS geography type

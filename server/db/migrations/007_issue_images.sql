@@ -1,4 +1,4 @@
-CREATE TABLE issue_images (
+CREATE TABLE IF NOT EXISTS issue_images (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     issue_id      UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
     uploader_id   UUID REFERENCES users(id),  -- Connects to the citizen OR the field worker

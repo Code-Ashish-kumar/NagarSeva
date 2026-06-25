@@ -43,13 +43,29 @@ function generateToken(user) {
   );
 }
 
+/** Parse a duration string like '7d', '15m', '2h' into milliseconds */
+function parseDurationMs(duration) {
+  const match = duration.match(/^(\d+)([smhd])$/);
+  if (!match) return 7 * 24 * 60 * 60 * 1000; // default 7 days
+  const num = parseInt(match[1], 10);
+  const unit = match[2];
+  switch (unit) {
+    case 's': return num * 1000;
+    case 'm': return num * 60 * 1000;
+    case 'h': return num * 60 * 60 * 1000;
+    case 'd': return num * 24 * 60 * 60 * 1000;
+    default:  return 7 * 24 * 60 * 60 * 1000;
+  }
+}
+
 /** Set the JWT as an httpOnly cookie on the response */
 function setTokenCookie(res, token) {
+  const maxAge = parseDurationMs(process.env.JWT_EXPIRES_IN || '7d');
   res.cookie('token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production', // HTTPS only in prod; works on HTTP in dev
     sameSite: 'lax',                               // 'lax' works with Vite proxy; 'strict' breaks cross-origin dev
-    maxAge: 7 * 24 * 60 * 60 * 1000,              // 7 days in ms
+    maxAge,
   });
 }
 
@@ -327,7 +343,11 @@ const me = async (req, res) => {
  * Clears the JWT cookie.
  */
 const logout = async (req, res) => {
-  res.clearCookie('token', { httpOnly: true, sameSite: 'lax' });
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  });
   res.status(200).json({ message: 'Logged out successfully.' });
 };
 

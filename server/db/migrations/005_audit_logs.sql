@@ -1,4 +1,4 @@
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     issue_id    UUID REFERENCES issues(id),
     from_status VARCHAR(20),
