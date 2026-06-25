@@ -10,34 +10,58 @@ const asyncHandler = require('../utils/asyncHandler');
 /**
  * POST /api/complaints/analyze
  *
- * Body:
- *   imageBase64  {string}  — Base64 image (no data-URI prefix)
- *   mimeType     {string}  — e.g. "image/jpeg"
- *   description  {string}  — optional user text
- *   location     {object}  — optional { lat, lng, address }
+ * Accepts either:
+ *   Single image (legacy):
+ *     imageBase64  {string}
+ *     mimeType     {string}
+ *
+ *   Multiple images:
+ *     images       {Array<{ imageBase64, mimeType }>}
+ *
+ * Common optional fields:
+ *   description  {string}
+ *   location     {object} — { lat, lng, address }
  *
  * Returns: the structured AI analysis JSON.
  */
 const analyze = asyncHandler(async (req, res) => {
-  const { imageBase64, mimeType, description, location } = req.body;
+  const { imageBase64, mimeType, images, description, location } = req.body;
 
-  if (!imageBase64 || typeof imageBase64 !== 'string') {
-    return res.status(400).json({ error: 'MISSING_IMAGE', message: 'imageBase64 is required.' });
+  // Normalize to array of images
+  let imageList = [];
+
+  if (Array.isArray(images) && images.length > 0) {
+    imageList = images;
+  } else if (imageBase64 && typeof imageBase64 === 'string') {
+    imageList = [{ imageBase64, mimeType }];
   }
 
-  if (!mimeType || !mimeType.startsWith('image/')) {
-    return res.status(400).json({ error: 'INVALID_MIME', message: 'A valid image mimeType is required.' });
+  if (imageList.length === 0) {
+    return res.status(400).json({ error: 'MISSING_IMAGE', message: 'At least one image is required.' });
   }
 
-  // Rough size guard: base64 of a 10MB image ≈ 13.3MB string
-  if (imageBase64.length > 14_000_000) {
-    return res.status(413).json({ error: 'IMAGE_TOO_LARGE', message: 'Image must be under 10MB.' });
+  // Validate each image
+  for (let i = 0; i < imageList.length; i++) {
+    const img = imageList[i];
+    if (!img.imageBase64 || typeof img.imageBase64 !== 'string') {
+      return res.status(400).json({ error: 'INVALID_IMAGE', message: `Image ${i + 1} has invalid base64 data.` });
+    }
+    if (!img.mimeType || !img.mimeType.startsWith('image/')) {
+      return res.status(400).json({ error: 'INVALID_MIME', message: `Image ${i + 1} has an invalid mimeType.` });
+    }
+    if (img.imageBase64.length > 14_000_000) {
+      return res.status(413).json({ error: 'IMAGE_TOO_LARGE', message: `Image ${i + 1} exceeds the 10MB limit.` });
+    }
+  }
+
+  // Cap at 5 images
+  if (imageList.length > 5) {
+    imageList = imageList.slice(0, 5);
   }
 
   try {
     const result = await analyzeComplaint(
-      imageBase64,
-      mimeType,
+      imageList,
       description || '',
       location || null
     );

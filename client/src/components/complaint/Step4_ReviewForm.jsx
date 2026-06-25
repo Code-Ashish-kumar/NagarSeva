@@ -42,7 +42,7 @@ function SeverityBadge({ severity }) {
 }
 
 export default function Step4_ReviewForm({ onBack, onGoToStep }) {
-  const { aiResult, imagePreviewUrl, location, description } =
+  const { aiResult, images, imagePreviewUrl, location, description } =
     useSelector((s) => s.complaint);
 
   if (!aiResult) return null;
@@ -60,18 +60,28 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
 
       <div className="review-grid">
 
-        {/* Image thumbnail */}
+        {/* Image thumbnails */}
         <div className="review-field">
-          <p className="review-field-label">Evidence Photo</p>
+          <p className="review-field-label">Evidence Photos ({images.length})</p>
           <EditLink label="Image" stepIndex={1} onGoToStep={onGoToStep} />
-          {imagePreviewUrl && (
-            <img
-              className="review-image-thumb"
-              src={imagePreviewUrl}
-              alt="Complaint evidence"
-              style={{ marginTop: 8 }}
-            />
-          )}
+          <div className="review-images-row" style={{ marginTop: 8 }}>
+            {images.length > 0 ? (
+              images.map((img, idx) => (
+                <img
+                  key={idx}
+                  className="review-image-thumb-small"
+                  src={img.previewUrl}
+                  alt={`Evidence ${idx + 1}`}
+                />
+              ))
+            ) : imagePreviewUrl && (
+              <img
+                className="review-image-thumb"
+                src={imagePreviewUrl}
+                alt="Complaint evidence"
+              />
+            )}
+          </div>
         </div>
 
         {/* Category */}

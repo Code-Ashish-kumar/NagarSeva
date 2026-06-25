@@ -9,11 +9,12 @@ import { createSlice } from '@reduxjs/toolkit';
 
 const initialState = {
   step: 0,
-  // Step 1 — Image
-  imageFile: null,           // not serializable; stored as object URL string for redux
-  imagePreviewUrl: null,     // string: object URL or data URL for preview
-  imageBase64: null,         // string: pure base64 (no data-URI prefix)
-  imageMimeType: null,       // string: e.g. "image/jpeg"
+  // Step 1 — Images (supports multiple)
+  images: [],              // Array of { previewUrl, base64, mimeType }
+  // Legacy single-image accessors (derived from images[0])
+  imagePreviewUrl: null,
+  imageBase64: null,
+  imageMimeType: null,
   // Step 2 — Location
   location: null,            // { lat, lng, address? }
   // Step 3 — Description
@@ -25,6 +26,8 @@ const initialState = {
   rejectionReason: null,
 };
 
+const MAX_IMAGES = 5;
+
 const complaintSlice = createSlice({
   name: 'complaint',
   initialState,
@@ -32,17 +35,46 @@ const complaintSlice = createSlice({
     setStep(state, action) {
       state.step = action.payload;
     },
+    /** Add one or more images. payload: { previewUrl, base64, mimeType } */
+    addImage(state, action) {
+      if (state.images.length >= MAX_IMAGES) return;
+      state.images.push(action.payload);
+      // Keep legacy fields pointing to first image
+      if (state.images.length === 1) {
+        state.imagePreviewUrl = action.payload.previewUrl;
+        state.imageBase64     = action.payload.base64;
+        state.imageMimeType   = action.payload.mimeType;
+      }
+      // Clear any stale rejection when user adds a new image
+      state.isRejected      = false;
+      state.rejectionReason = null;
+    },
+    /** Remove image at index */
+    removeImage(state, action) {
+      const idx = action.payload;
+      state.images.splice(idx, 1);
+      // Update legacy fields
+      if (state.images.length > 0) {
+        state.imagePreviewUrl = state.images[0].previewUrl;
+        state.imageBase64     = state.images[0].base64;
+        state.imageMimeType   = state.images[0].mimeType;
+      } else {
+        state.imagePreviewUrl = null;
+        state.imageBase64     = null;
+        state.imageMimeType   = null;
+      }
+    },
+    /** Legacy: set a single image (replaces all) */
     setImage(state, action) {
-      // payload: { imagePreviewUrl, imageBase64, imageMimeType }
-      state.imagePreviewUrl = action.payload.imagePreviewUrl;
-      state.imageBase64     = action.payload.imageBase64;
-      state.imageMimeType   = action.payload.imageMimeType;
-      // Clear any stale rejection when user picks a new image
+      const { imagePreviewUrl, imageBase64, imageMimeType } = action.payload;
+      state.images = [{ previewUrl: imagePreviewUrl, base64: imageBase64, mimeType: imageMimeType }];
+      state.imagePreviewUrl = imagePreviewUrl;
+      state.imageBase64     = imageBase64;
+      state.imageMimeType   = imageMimeType;
       state.isRejected      = false;
       state.rejectionReason = null;
     },
     setLocation(state, action) {
-      // payload: { lat, lng, address? }
       state.location = action.payload;
     },
     setDescription(state, action) {
@@ -52,7 +84,6 @@ const complaintSlice = createSlice({
       state.aiResult = action.payload;
     },
     setRejected(state, action) {
-      // payload: { reason: string }
       state.isRejected      = true;
       state.rejectionReason = action.payload.reason;
     },
@@ -65,6 +96,8 @@ const complaintSlice = createSlice({
 export const {
   setStep,
   setImage,
+  addImage,
+  removeImage,
   setLocation,
   setDescription,
   setAiResult,

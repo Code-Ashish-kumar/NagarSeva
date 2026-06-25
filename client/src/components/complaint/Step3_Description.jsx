@@ -17,7 +17,7 @@ const MAX_CHARS = 500;
 
 export default function Step3_Description({ onNext, onBack }) {
   const dispatch = useDispatch();
-  const { description: savedDesc, imageBase64, imageMimeType, location } =
+  const { description: savedDesc, images, location } =
     useSelector((s) => s.complaint);
 
   const [text,    setText]    = useState(savedDesc ?? '');
@@ -35,13 +35,13 @@ export default function Step3_Description({ onNext, onBack }) {
     dispatch(setDescription(text));
 
     try {
-      // Re-run analysis with the full context so AI description is richer
-      const result = await apiConnector('POST', endpoints.ANALYZE_COMPLAINT_API, {
-        imageBase64,
-        mimeType: imageMimeType,
+      // Send all images for richer AI analysis
+      const payload = {
+        images: images.map((img) => ({ imageBase64: img.base64, mimeType: img.mimeType })),
         description: text,
         location,
-      });
+      };
+      const result = await apiConnector('POST', endpoints.ANALYZE_COMPLAINT_API, payload);
 
       dispatch(setAiResult(result));
       onNext();
