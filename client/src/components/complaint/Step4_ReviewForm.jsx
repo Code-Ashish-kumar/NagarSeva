@@ -111,7 +111,7 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const { aiResult, images, imagePreviewUrl, location, description } =
+  const { aiResult, images, location, description } =
     useSelector((s) => s.complaint);
 
   const [submitting, setSubmitting] = useState(false);
@@ -192,22 +192,14 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
           <p className="review-field-label">Evidence Photos ({images.length})</p>
           <EditLink label="Image" stepIndex={1} onGoToStep={onGoToStep} />
           <div className="review-images-row" style={{ marginTop: 8 }}>
-            {images.length > 0 ? (
-              images.map((img, idx) => (
-                <img
-                  key={idx}
-                  className="review-image-thumb-small"
-                  src={img.previewUrl}
-                  alt={`Evidence ${idx + 1}`}
-                />
-              ))
-            ) : imagePreviewUrl && (
+            {images.map((img, idx) => (
               <img
-                className="review-image-thumb"
-                src={imagePreviewUrl}
-                alt="Complaint evidence"
+                key={idx}
+                className="review-image-thumb-small"
+                src={img.previewUrl}
+                alt={`Evidence ${idx + 1}`}
               />
-            )}
+            ))}
           </div>
         </div>
 

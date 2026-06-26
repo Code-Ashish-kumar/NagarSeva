@@ -14,6 +14,7 @@ export const endpoints = {
   // ISSUE ENDPOINTS
   CREATE_ISSUE_API:        BASE_URL + "/issues",
   MY_ISSUES_API:           BASE_URL + "/issues/mine",
+  VIEWPORT_ISSUES_API:     BASE_URL + "/issues/viewport",
   ME_TOO_API:              (id) => BASE_URL + "/issues/" + id + "/me-too",
   // UPLOAD ENDPOINTS
   UPLOAD_SIGNATURE_API:    BASE_URL + "/upload/signature",

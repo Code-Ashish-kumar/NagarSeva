@@ -4,7 +4,7 @@
  * Handles complaint-related API logic.
  * Current scope: AI analysis only — no DB persistence yet.
  */
-const { analyzeComplaint } = require('../config/gemini');
+const { analyzeComplaint } = require('../config/ai');
 const asyncHandler = require('../utils/asyncHandler');
 
 /**
@@ -70,7 +70,7 @@ const analyze = asyncHandler(async (req, res) => {
   } catch (err) {
     console.error('[complaints/analyze] AI error:', err.message);
 
-    if (err.code === 'GEMINI_RATE_LIMITED') {
+    if (err.code === 'AI_RATE_LIMITED') {
       return res.status(429).json({ error: 'RATE_LIMITED', message: 'AI service is busy. Please try again shortly.' });
     }
 

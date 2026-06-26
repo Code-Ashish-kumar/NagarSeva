@@ -90,46 +90,37 @@ Register page
     │
     ▼ POST /api/auth/verify-email
     │   → Marks user verified
-    │   → Returns access_token + refresh_token
-    │   → Frontend stores in localStorage, sets AuthContext
+    │   → Marks user verified, sets httpOnly JWT cookie
+    │   → Frontend dispatches setAuth, redirects to dashboard
     │
-    ▼ /map (protected) ← user is now logged in
+    ▼ /citizen (protected) ← user is now logged in
 ```
 
 ---
 
-## Files Created
+## Key Backend Files
 
-### Backend (`server/`)
 ```
 server.js                        ← entry point
-src/app.js                       ← Express setup
+src/app.js                       ← Express setup, route mounting
 src/config/db.js                 ← Postgres pool
 src/config/mailer.js             ← Nodemailer + OTP email
-src/middleware/auth.js           ← JWT verification
+src/config/ai.js                 ← Groq (Llama 4 Scout) AI analysis
+src/config/cloudinary.js         ← Cloudinary image upload config
+src/config/dedup.js              ← Deduplication config (radius, boost)
+src/middleware/auth.js           ← JWT verification (httpOnly cookie)
 src/middleware/roleGuard.js      ← RBAC
 src/middleware/rateLimiter.js    ← auth + OTP rate limits
 src/middleware/errorHandler.js   ← centralized errors
-src/routes/auth.js               ← all 6 auth endpoints
+src/routes/auth.js               ← auth endpoints
+src/routes/issue.js              ← issue CRUD + spatial + me-too
+src/routes/complaints.js         ← AI image analysis
+src/routes/upload.js             ← Cloudinary signature
+src/controller/auth.js           ← register, login, verify, logout
+src/controller/issue.js          ← create, dedup, viewport, me-too
+src/controller/complaints.js     ← AI analysis handler
+src/controller/upload.js         ← signed upload handler
 src/utils/asyncHandler.js        ← try/catch wrapper
-db/migrations/001_enable_extensions.sql
-db/migrations/002_create_users.sql
-db/migrations/003_create_otps.sql
-db/migrate.js                    ← migration runner
+src/utils/dedupLock.js           ← advisory lock key computation
+db/migrations/                   ← 7 SQL migration files
 ```
-
-### Frontend (`client/`)
-```
-src/main.jsx                     ← React entry point
-src/App.jsx                      ← Router + routes
-src/api/axios.js                 ← Axios + JWT interceptors + auto-refresh
-src/context/AuthContext.jsx      ← Global auth state
-src/components/common/ProtectedRoute.jsx ← Route guard
-src/pages/Login.jsx              ← Login page
-src/pages/Register.jsx           ← Register page
-src/pages/VerifyEmail.jsx        ← OTP verification page
-src/pages/MapView.jsx            ← Placeholder (Day 2: real map)
-src/styles/globals.css           ← Design system (CSS variables)
-src/styles/auth.css              ← Auth page styles
-```
-

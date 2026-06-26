@@ -411,72 +411,119 @@ const getMyIssues = async (req, res) => {
 /**
  * POST /api/issues/:id/me-too
  * Allows a citizen to endorse an existing issue ("Me too"), boosting its priority.
+ *
+ * Location-aware validation:
+ *   - If user is already a watcher → allowed (they've previously proven involvement)
+ *   - Otherwise, user must provide GPS coords (X-User-Lat, X-User-Lng headers)
+ *     and be within 500m of the issue to endorse it.
  */
+const ENDORSE_RADIUS_METRES = 500;
+
 const meToo = async (req, res) => {
+  const issue_id = req.params.id;
+  const user_id = req.user.id;
+
+  // Parse optional location from headers
+  const userLat = parseFloat(req.headers['x-user-lat']);
+  const userLng = parseFloat(req.headers['x-user-lng']);
+  const hasLocation = !isNaN(userLat) && !isNaN(userLng);
+
+  // 1. Check issue exists and is open (PK lookup — O(1))
+  const issueCheck = await pool.query(
+    'SELECT id, reporter_id, status, report_count, priority_score FROM issues WHERE id = $1',
+    [issue_id]
+  );
+  if (issueCheck.rows.length === 0) {
+    return res.status(404).json({ error: 'ISSUE_NOT_FOUND', message: 'Issue not found.' });
+  }
+
+  const issue = issueCheck.rows[0];
+
+  // 2. Check if issue is closed/rejected/resolved
+  if (['CLOSED', 'REJECTED', 'RESOLVED'].includes(issue.status)) {
+    return res.status(400).json({ error: 'ISSUE_CLOSED', message: 'This issue is no longer accepting endorsements.' });
+  }
+
+  // 3. Check if user is the original reporter
+  if (issue.reporter_id === user_id) {
+    return res.status(400).json({ error: 'SELF_ENDORSE', message: 'You cannot endorse your own issue.' });
+  }
+
+  // 4. Check if user is already a watcher (composite PK index — O(1))
+  const watcherCheck = await pool.query(
+    'SELECT 1 FROM watchers WHERE issue_id = $1 AND user_id = $2',
+    [issue_id, user_id]
+  );
+  if (watcherCheck.rows.length > 0) {
+    return res.status(200).json({
+      message: 'You have already endorsed this issue.',
+      report_count: issue.report_count,
+      already_endorsed: true,
+    });
+  }
+
+  // 5. Proximity validation — user must be within 500m of the issue
+  if (!hasLocation) {
+    return res.status(400).json({
+      error: 'LOCATION_REQUIRED',
+      message: 'Location access is required to endorse issues near you. Please enable GPS.'
+    });
+  }
+
+  const proximityCheck = await pool.query(
+    `SELECT 1 FROM issues
+     WHERE id = $1
+       AND ST_DWithin(location, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, $4)`,
+    [issue_id, userLng, userLat, ENDORSE_RADIUS_METRES]
+  );
+
+  if (proximityCheck.rows.length === 0) {
+    return res.status(403).json({
+      error: 'TOO_FAR',
+      message: 'You must be within 500m of this issue to endorse it.'
+    });
+  }
+
+  // 6. All checks pass — execute endorsement in transaction
+  //    Insert watcher FIRST, use RETURNING to detect if genuinely new.
+  //    Only increment counts if the insert actually added a row.
   const client = await pool.connect();
-
   try {
-    const issue_id = req.params.id;
-    const user_id = req.user.id;
-
-    // 1. Check issue exists and is open
-    const issueCheck = await pool.query(
-      'SELECT id, reporter_id, status, report_count, priority_score FROM issues WHERE id = $1',
-      [issue_id]
-    );
-    if (issueCheck.rows.length === 0) {
-      client.release();
-      return res.status(404).json({ error: 'ISSUE_NOT_FOUND', message: 'Issue not found.' });
-    }
-
-    const issue = issueCheck.rows[0];
-
-    // 2. Check if issue is closed/rejected/resolved
-    if (['CLOSED', 'REJECTED', 'RESOLVED'].includes(issue.status)) {
-      client.release();
-      return res.status(400).json({ error: 'ISSUE_CLOSED', message: 'This issue is no longer accepting endorsements.' });
-    }
-
-    // 3. Check if user is the original reporter
-    if (issue.reporter_id === user_id) {
-      client.release();
-      return res.status(400).json({ error: 'SELF_ENDORSE', message: 'You cannot endorse your own issue.' });
-    }
-
-    // 4. Check if user is already a watcher (already endorsed)
-    const watcherCheck = await pool.query(
-      'SELECT 1 FROM watchers WHERE issue_id = $1 AND user_id = $2',
-      [issue_id, user_id]
-    );
-    if (watcherCheck.rows.length > 0) {
-      client.release();
-      return res.status(200).json({ message: 'You have already endorsed this issue.' });
-    }
-
-    // 5. Execute endorsement within a transaction
     await client.query('BEGIN');
 
-    await client.query(
-      `UPDATE issues SET report_count = report_count + 1, priority_score = priority_score + $1, updated_at = NOW() WHERE id = $2`,
-      [DEDUP_PRIORITY_BOOST, issue_id]
+    // Attempt watcher insert — RETURNING tells us if it was new
+    const insertResult = await client.query(
+      `INSERT INTO watchers (issue_id, user_id) VALUES ($1, $2)
+       ON CONFLICT (issue_id, user_id) DO NOTHING
+       RETURNING issue_id`,
+      [issue_id, user_id]
     );
 
-    await client.query(
-      `INSERT INTO watchers (issue_id, user_id) VALUES ($1, $2) ON CONFLICT (issue_id, user_id) DO NOTHING`,
-      [issue_id, user_id]
+    // If no row returned → user was already a watcher (caught race condition)
+    if (insertResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(200).json({
+        message: 'You have already endorsed this issue.',
+        report_count: issue.report_count,
+        already_endorsed: true,
+      });
+    }
+
+    // Watcher was genuinely new — safe to increment counts
+    const updated = await client.query(
+      `UPDATE issues SET report_count = report_count + 1, priority_score = priority_score + $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING report_count, priority_score`,
+      [DEDUP_PRIORITY_BOOST, issue_id]
     );
 
     await client.query('COMMIT');
 
-    const newReportCount = issue.report_count + 1;
-    const newPriorityScore = parseFloat(issue.priority_score) + DEDUP_PRIORITY_BOOST;
-
     res.status(200).json({
       message: "Thanks! You've endorsed this issue. Its priority has been boosted.",
-      report_count: newReportCount,
-      priority_score: newPriorityScore
+      report_count: updated.rows[0].report_count,
+      priority_score: parseFloat(updated.rows[0].priority_score),
     });
-
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[meToo]', err);
@@ -486,4 +533,54 @@ const meToo = async (req, res) => {
   }
 };
 
-module.exports = { createIssue, updateIssueStatus, getNearbyIssues, getMyIssues, watchIssue, unwatchIssue, meToo };
+/**
+ * GET /api/issues/viewport
+ * Returns issues within the map's visible bounding box.
+ * Uses the && operator with ST_MakeEnvelope for pure GIST index scan.
+ */
+const viewportSchema = Joi.object({
+  sw_lng: Joi.number().min(-180).max(180).required(),
+  sw_lat: Joi.number().min(-90).max(90).required(),
+  ne_lng: Joi.number().min(-180).max(180).required(),
+  ne_lat: Joi.number().min(-90).max(90).required(),
+});
+
+const getViewportIssues = async (req, res) => {
+  try {
+    const { error, value } = viewportSchema.validate(req.query);
+    if (error) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+    }
+
+    const { sw_lng, sw_lat, ne_lng, ne_lat } = value;
+
+    const result = await pool.query(
+      `SELECT 
+        i.id, i.short_id, i.category, i.status, i.report_count,
+        i.priority_score, i.address, i.description,
+        ST_X(i.location::geometry) AS lng,
+        ST_Y(i.location::geometry) AS lat,
+        (
+          SELECT image_url FROM issue_images 
+          WHERE issue_id = i.id AND image_type = 'REPORT'
+          ORDER BY uploaded_at LIMIT 1
+        ) AS thumbnail
+      FROM issues i
+      WHERE i.location::geometry && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+        AND i.status NOT IN ('CLOSED', 'REJECTED')
+      ORDER BY i.priority_score DESC
+      LIMIT 500`,
+      [sw_lng, sw_lat, ne_lng, ne_lat]
+    );
+
+    res.status(200).json({
+      count: result.rows.length,
+      data: result.rows,
+    });
+  } catch (err) {
+    console.error('[getViewportIssues]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch viewport issues.' });
+  }
+};
+
+module.exports = { createIssue, updateIssueStatus, getNearbyIssues, getMyIssues, getViewportIssues, watchIssue, unwatchIssue, meToo };

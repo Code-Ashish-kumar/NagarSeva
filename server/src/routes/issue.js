@@ -16,6 +16,7 @@ const {
   createIssue,
   getNearbyIssues,
   getMyIssues,
+  getViewportIssues,
   updateIssueStatus,
   watchIssue,
   unwatchIssue,
@@ -25,6 +26,13 @@ const {
 const router = express.Router();
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/issues/viewport
+ * Public — returns issues within the map's visible bounding box.
+ * Query params: sw_lng, sw_lat, ne_lng, ne_lat
+ */
+router.get('/viewport', getViewportIssues);
 
 /**
  * GET /api/issues/nearby

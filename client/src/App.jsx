@@ -14,6 +14,7 @@ import FieldWorkerDashboard from "./pages/FieldWorkerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ReportWizard from "./pages/ReportWizard";
 import MyComplaints from "./pages/MyComplaints";
+import CityPulse from "./pages/CityPulse";
 
 
 export default function App() {
@@ -62,6 +63,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={["CITIZEN"]}>
             <MyComplaints />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/citizen/city-pulse"
+        element={
+          <ProtectedRoute roles={["CITIZEN"]}>
+            <CityPulse />
           </ProtectedRoute>
         }
       />

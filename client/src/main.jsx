@@ -6,6 +6,7 @@ import { store } from "./store/store";
 import App from "./App.jsx";
 import "./styles/globals.css";
 import "./styles/complaint.css";
+import "./styles/citypulse.css";
 
 
 ReactDOM.createRoot(document.getElementById("root")).render(

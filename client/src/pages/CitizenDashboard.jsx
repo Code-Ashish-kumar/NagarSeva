@@ -81,6 +81,14 @@ export default function CitizenDashboard() {
           </button>
 
           <button
+            className="btn-register-complaint"
+            onClick={() => navigate('/citizen/city-pulse')}
+            style={{ background: 'linear-gradient(135deg, #0f172a, #1e293b)', color: 'var(--color-accent)', border: '1px solid rgba(56,189,248,0.3)' }}
+          >
+            🗺️ City Pulse
+          </button>
+
+          <button
             id="citizen-signout-btn"
             className="btn-signout-secondary"
             onClick={handleLogout}

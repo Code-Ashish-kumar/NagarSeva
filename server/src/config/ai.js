@@ -1,5 +1,5 @@
 /**
- * src/config/gemini.js
+ * src/config/ai.js
  *
  * AI-powered civic complaint analysis using Groq (Llama 4 Scout).
  * Uses the OpenAI-compatible Groq API for fast multimodal inference.
