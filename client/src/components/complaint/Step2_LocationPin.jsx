@@ -5,8 +5,9 @@
  *  1. Request browser geolocation on mount.
  *  2. Render a Leaflet map centred on user position (or default centre of India).
  *  3. Draggable marker — on drag end dispatch setLocation.
- *  4. Optional reverse-geocode via Nominatim for a human-readable address.
- *  5. "Next" is disabled until a pin has been placed.
+ *  4. Reverse-geocode via Nominatim for a suggested address.
+ *  5. Editable address field for user to refine/enter manually.
+ *  6. "Next" is disabled until a pin has been placed.
  */
 import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -37,6 +38,17 @@ function PinDropHandler({ onPinDrop }) {
   return null;
 }
 
+/** Flies the map to a new center+zoom when props change */
+function FlyToLocation({ center, zoom }) {
+  const map = useMapEvents({});
+  useEffect(() => {
+    if (center) {
+      map.flyTo([center.lat, center.lng], zoom, { duration: 1.2 });
+    }
+  }, [center, zoom, map]);
+  return null;
+}
+
 /** Reverse-geocode via Nominatim (free, no API key needed) */
 async function reverseGeocode(lat, lng) {
   try {
@@ -57,9 +69,12 @@ export default function Step2_LocationPin({ onNext, onBack }) {
 
   const [center, setCenter]       = useState(saved ?? DEFAULT_CENTER);
   const [zoom,   setZoom]         = useState(saved ? LOCATED_ZOOM : DEFAULT_ZOOM);
-  const [pin,    setPin]          = useState(saved);        // { lat, lng, address? }
-  const [geoStatus, setGeoStatus] = useState('pending');   // pending | granted | denied
-  const [address,   setAddress]   = useState(saved?.address ?? null);
+  const [pin,    setPin]          = useState(saved);
+  const [geoStatus, setGeoStatus] = useState('pending');
+  const [autoAddress, setAutoAddress] = useState(saved?.address ?? null);
+  const [userAddress, setUserAddress] = useState(saved?.userAddress ?? '');
+  const [geocoding,   setGeocoding]   = useState(false);
+  const [flyTarget,   setFlyTarget]   = useState(null);   // { lat, lng } to fly to
   const mapRef = useRef(null);
 
   // Request geolocation on mount
@@ -73,8 +88,8 @@ export default function Step2_LocationPin({ onNext, onBack }) {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCenter(loc);
         setZoom(LOCATED_ZOOM);
+        setFlyTarget(loc);  // triggers map fly animation
         setGeoStatus('granted');
-        // Auto-place initial pin at user position (they can still drag)
         handlePinDrop(loc);
       },
       () => {
@@ -87,16 +102,44 @@ export default function Step2_LocationPin({ onNext, onBack }) {
 
   async function handlePinDrop(loc) {
     setPin(loc);
-    // Kick off reverse geocode asynchronously (UI doesn't block)
+    setGeocoding(true);
     const addr = await reverseGeocode(loc.lat, loc.lng);
-    const full = { ...loc, address: addr };
-    setPin(full);
-    setAddress(addr);
-    dispatch(setLocation(full));
+    setAutoAddress(addr);
+    setGeocoding(false);
+    // Only auto-fill userAddress if it's empty (don't overwrite manual edits)
+    if (!userAddress.trim()) {
+      setUserAddress(addr || '');
+    }
+    // Dispatch with whatever address is currently in the input
+    const finalAddress = userAddress.trim() || addr || '';
+    dispatch(setLocation({ ...loc, address: finalAddress, userAddress: finalAddress }));
+  }
+
+  function handleAddressChange(e) {
+    const val = e.target.value;
+    setUserAddress(val);
+    // Update Redux with the user-typed address
+    if (pin) {
+      dispatch(setLocation({ lat: pin.lat, lng: pin.lng, address: val, userAddress: val }));
+    }
+  }
+
+  function handleUseDetected() {
+    if (autoAddress) {
+      setUserAddress(autoAddress);
+      if (pin) {
+        dispatch(setLocation({ lat: pin.lat, lng: pin.lng, address: autoAddress, userAddress: autoAddress }));
+      }
+    }
   }
 
   function handleNext() {
-    if (pin) onNext();
+    if (pin) {
+      // Final sync of address to Redux before advancing
+      const finalAddr = userAddress.trim() || autoAddress || '';
+      dispatch(setLocation({ lat: pin.lat, lng: pin.lng, address: finalAddr, userAddress: userAddress }));
+      onNext();
+    }
   }
 
   return (
@@ -128,6 +171,7 @@ export default function Step2_LocationPin({ onNext, onBack }) {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <PinDropHandler onPinDrop={handlePinDrop} />
+          {flyTarget && <FlyToLocation center={flyTarget} zoom={LOCATED_ZOOM} />}
           {pin && (
             <Marker
               position={[pin.lat, pin.lng]}
@@ -143,17 +187,47 @@ export default function Step2_LocationPin({ onNext, onBack }) {
         </MapContainer>
       </div>
 
-      {/* Address pill */}
-      <div className={`location-pill${pin ? ' pinned' : ''}`}>
-        {pin ? (
-          <>
-            <span>📍</span>
-            <span>{address ?? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`}</span>
-          </>
-        ) : (
-          <><span>📍</span><span>No pin dropped yet — click on the map</span></>
-        )}
-      </div>
+      {/* Detected address pill */}
+      {pin && (
+        <div className={`location-pill pinned`}>
+          <span>📍</span>
+          <span>
+            {geocoding ? 'Detecting address…' : (autoAddress ?? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`)}
+          </span>
+        </div>
+      )}
+
+      {/* User-editable address field */}
+      {pin && (
+        <div className="address-input-wrap">
+          <label htmlFor="address-input" className="address-input-label">
+            Confirm or edit issue area address
+          </label>
+          <div className="address-input-row">
+            <input
+              id="address-input"
+              type="text"
+              className="address-input"
+              placeholder="e.g. Near SBI Bank, MG Road, Sector 5, Lucknow"
+              value={userAddress}
+              onChange={handleAddressChange}
+              maxLength={300}
+            />
+          </div>
+          {autoAddress && userAddress !== autoAddress && (
+            <button
+              type="button"
+              className="address-use-detected"
+              onClick={handleUseDetected}
+            >
+              ↩ Use detected: <span>{autoAddress.length > 60 ? autoAddress.slice(0, 60) + '…' : autoAddress}</span>
+            </button>
+          )}
+          <p className="address-hint">
+            💡 A clear landmark or street name helps resolve your issue faster
+          </p>
+        </div>
+      )}
 
       <div className="wizard-nav">
         <button id="complaint-step2-back" className="btn-back" onClick={onBack}>

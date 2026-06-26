@@ -4,3 +4,6 @@ client/dist
 server/.env
 server/node_modules
 server/dist
+.kiro
+
+AUTH_SETUP.md

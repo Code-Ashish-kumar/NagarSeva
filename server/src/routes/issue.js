@@ -15,9 +15,11 @@ const roleGuard = require('../middleware/roleGuard');
 const {
   createIssue,
   getNearbyIssues,
+  getMyIssues,
   updateIssueStatus,
   watchIssue,
   unwatchIssue,
+  meToo,
 } = require('../controller/issue');
 
 const router = express.Router();
@@ -35,10 +37,23 @@ const router = express.Router();
 router.get('/nearby', getNearbyIssues);
 
 /**
+ * GET /api/issues/mine
+ * Authenticated — returns all issues reported by the current user.
+ * NOTE: Must be defined before /:id routes.
+ */
+router.get('/mine', auth, getMyIssues);
+
+/**
  * POST /api/issues
  * Authenticated citizens report a new issue.
  */
 router.post('/', auth, createIssue);
+
+/**
+ * POST /api/issues/:id/me-too
+ * Authenticated citizen endorses an existing issue to boost its priority.
+ */
+router.post('/:id/me-too', auth, meToo);
 
 /**
  * PATCH /api/issues/:id/status

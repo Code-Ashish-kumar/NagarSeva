@@ -1,34 +1,45 @@
 /**
  * src/config/gemini.js
  *
- * Wraps the Google GenAI SDK for civic complaint analysis.
- * Model priority: gemini-2.5-flash (generous free tier) →
- *                 gemini-2.5-flash-lite (fallback, fastest + cheapest)
+ * AI-powered civic complaint analysis using Groq (Llama 4 Scout).
+ * Uses the OpenAI-compatible Groq API for fast multimodal inference.
  *
- * Supports multiple images per request for richer analysis.
+ * Model: meta-llama/llama-4-scout-17b-16e-instruct
+ *   - Natively multimodal (image + text)
+ *   - 128K context window
+ *   - Supports JSON mode
+ *   - Up to 5 images per request
+ *   - 460+ tokens/sec on Groq hardware
+ *
+ * Retry strategy: Exponential backoff with full jitter on 429/503 errors.
  */
-const { GoogleGenAI } = require('@google/genai');
+const Groq = require('groq-sdk');
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Model cascade — most capable first, lighter model as fallback
-const MODEL_CASCADE = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+const MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
-/** Parse the retryDelay seconds out of an error message */
-function parseRetryDelay(err) {
-  try {
-    const match = err.message?.match(/"retryDelay"\s*:\s*"(\d+)s"/);
-    if (match) return parseInt(match[1], 10) * 1000;
-  } catch { /* ignore */ }
-  return 30_000;
-}
+// Retry configuration
+const MAX_RETRIES   = 4;
+const BASE_DELAY_MS = 2000;     // 2s base
+const MAX_DELAY_MS  = 30000;    // cap at 30s
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * Build the prompt text for civic complaint analysis.
+ * Exponential backoff with full jitter.
+ * Prevents thundering herd when multiple requests retry simultaneously.
  */
-function buildPromptText(description, location, imageCount) {
+function getBackoffDelay(attempt) {
+  const exponentialDelay = BASE_DELAY_MS * Math.pow(2, attempt);
+  const cappedDelay = Math.min(exponentialDelay, MAX_DELAY_MS);
+  return Math.random() * cappedDelay;
+}
+
+/**
+ * Build the system + user prompt for civic complaint analysis.
+ */
+function buildPrompt(description, location, imageCount) {
   const locationText = location
     ? `Location coordinates: ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}${location.address ? ` (${location.address})` : ''}.`
     : 'Location: not provided.';
@@ -37,9 +48,9 @@ function buildPromptText(description, location, imageCount) {
     ? `You have been provided ${imageCount} images of the same civic issue from different angles. Analyse ALL images together to form a comprehensive assessment.`
     : 'Analyse the provided image and classify whether it shows a genuine civic infrastructure issue.';
 
-  return `You are an AI system for a civic issue reporting platform called NagarSeva, used in Indian cities.
+  const systemPrompt = `You are an AI system for a civic issue reporting platform called NagarSeva, used in Indian cities. You analyse images of civic infrastructure problems and return structured JSON assessments.`;
 
-${imageNote}
+  const userPrompt = `${imageNote}
 
 ${locationText}
 User description: "${description || 'Not provided'}"
@@ -62,30 +73,45 @@ Rejection criteria (set is_valid_civic_issue to false):
 - No visible civic problem in the image
 - Image is too blurry to assess
 - Unrelated content (food, animals without civic context, etc.)`;
+
+  return { systemPrompt, userPrompt };
 }
 
 /**
- * Try a single model with multiple images; returns parsed JSON or throws.
+ * Call the Groq API with images and prompt.
  */
-async function tryModel(modelName, imageList, promptText) {
-  // Build parts: all images first, then the text prompt
-  const parts = imageList.map((img) => ({
-    inlineData: { data: img.imageBase64, mimeType: img.mimeType },
+async function callGroq(imageList, systemPrompt, userPrompt) {
+  // Build content array: images as base64 data URIs + text prompt
+  const content = imageList.map((img) => ({
+    type: 'image_url',
+    image_url: {
+      url: `data:${img.mimeType};base64,${img.imageBase64}`,
+    },
   }));
-  parts.push({ text: promptText });
+  content.push({ type: 'text', text: userPrompt });
 
-  const response = await ai.models.generateContent({
-    model: modelName,
-    contents: [{ role: 'user', parts }],
+  const completion = await groq.chat.completions.create({
+    model: MODEL,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content },
+    ],
+    temperature: 0.3,
+    max_completion_tokens: 1024,
+    response_format: { type: 'json_object' },
   });
 
-  const raw = response.text.trim();
+  const raw = completion.choices[0]?.message?.content?.trim();
+  if (!raw) throw new Error('Empty response from Groq');
+
+  // Strip optional markdown fences (shouldn't happen with json_object mode, but just in case)
   const clean = raw.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim();
   return JSON.parse(clean);
 }
 
 /**
  * Analyse civic complaint image(s) with optional description and location.
+ * Implements exponential backoff with jitter on transient errors.
  *
  * @param {Array<{ imageBase64: string, mimeType: string }>} imageList
  * @param {string} [description]
@@ -94,49 +120,45 @@ async function tryModel(modelName, imageList, promptText) {
  * @returns {Promise<object>} Structured analysis JSON
  */
 async function analyzeComplaint(imageList, description = '', location = null) {
-  const promptText = buildPromptText(description, location, imageList.length);
+  const { systemPrompt, userPrompt } = buildPrompt(description, location, imageList.length);
 
-  for (const modelName of MODEL_CASCADE) {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const parsed = await tryModel(modelName, imageList, promptText);
-      console.log(`[gemini] analysed ${imageList.length} image(s) with ${modelName}`);
+      const parsed = await callGroq(imageList, systemPrompt, userPrompt);
+      if (attempt > 0) {
+        console.log(`[groq] succeeded on retry #${attempt}`);
+      } else {
+        console.log(`[groq] analysed ${imageList.length} image(s) with ${MODEL}`);
+      }
       return parsed;
     } catch (err) {
-      const is429 = err.message?.includes('429') || err.status === 429;
-      const is404 = err.message?.includes('404') || err.status === 404;
+      const status = err?.status || err?.statusCode;
+      const is429 = status === 429 || err.message?.includes('429');
+      const is503 = status === 503 || err.message?.includes('503');
+      const is500 = status === 500;
 
-      if (is404) {
-        console.warn(`[gemini] ${modelName} not found (404) — trying next model…`);
+      // Retryable errors: rate limit, service unavailable, internal error
+      if (is429 || is503 || is500) {
+        if (attempt === MAX_RETRIES) {
+          console.error(`[groq] all ${MAX_RETRIES} retries exhausted`);
+          throw Object.assign(
+            new Error('AI service is currently busy. Please try again in a few minutes.'),
+            { code: 'AI_RATE_LIMITED' }
+          );
+        }
+
+        const delayMs = getBackoffDelay(attempt);
+        console.warn(
+          `[groq] ${status || 'error'} — retry ${attempt + 1}/${MAX_RETRIES} in ${(delayMs / 1000).toFixed(1)}s`
+        );
+        await sleep(delayMs);
         continue;
       }
 
-      if (is429) {
-        const delayMs = parseRetryDelay(err);
-        console.warn(`[gemini] ${modelName} rate-limited — waiting ${delayMs / 1000}s then retrying once…`);
-        await sleep(delayMs);
-
-        try {
-          const parsed = await tryModel(modelName, imageList, promptText);
-          console.log(`[gemini] retry succeeded with ${modelName}`);
-          return parsed;
-        } catch (retryErr) {
-          const retry429 = retryErr.message?.includes('429') || retryErr.status === 429;
-          if (retry429) {
-            console.warn(`[gemini] ${modelName} still rate-limited after retry — trying next model…`);
-            continue;
-          }
-          throw retryErr;
-        }
-      }
-
+      // Non-retryable error — throw immediately
       throw err;
     }
   }
-
-  throw Object.assign(
-    new Error('All Gemini models are currently rate-limited. Please wait a few minutes and try again.'),
-    { code: 'GEMINI_RATE_LIMITED' }
-  );
 }
 
 module.exports = { analyzeComplaint };

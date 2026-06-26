@@ -1,6 +1,8 @@
 const Joi    = require('joi');
 const crypto = require('crypto');
 const pool   = require('../config/db');
+const { DEDUP_RADIUS_METRES, DEDUP_PRIORITY_BOOST } = require('../config/dedup');
+const { computeLockKey } = require('../utils/dedupLock');
 
 // ─── Validation Schemas ──────────────────────────────────────────────────────
 
@@ -68,42 +70,100 @@ const createIssue = async (req, res) => {
 
     await client.query('BEGIN'); // Start transaction
 
-    // 1. Insert main issue record
-    const issueResult = await client.query(
-      `INSERT INTO issues (short_id, reporter_id, category, description, location, address)
-       VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7)
-       RETURNING id, short_id`,
-      [short_id, reporter_id, category, description, lng, lat, address]
-    );
-    
-    const newIssueId = issueResult.rows[0].id;
+    // Dedup: Acquire advisory lock for this category + grid cell
+    const lockKey = computeLockKey(category, lat, lng);
+    await client.query('SELECT pg_advisory_xact_lock($1)', [lockKey]);
 
-    // 2. Insert uploaded images into dependent table
-    if (image_urls && image_urls.length > 0) {
-      for (let url of image_urls) {
-        await client.query(
-          `INSERT INTO issue_images (issue_id, uploader_id, image_url, image_type)
-           VALUES ($1, $2, $3, 'REPORT')`,
-          [newIssueId, reporter_id, url]
-        );
+    // Dedup: Find best merge candidate (same category, nearby, open, not self-reported, not already watching)
+    const candidateResult = await client.query(
+      `SELECT id, short_id, report_count, priority_score
+       FROM issues
+       WHERE category = $1
+         AND status IN ('SUBMITTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'REOPENED')
+         AND reporter_id != $2
+         AND ST_DWithin(location, ST_SetSRID(ST_MakePoint($3, $4), 4326), $5)
+         AND id NOT IN (SELECT issue_id FROM watchers WHERE user_id = $2)
+       ORDER BY report_count DESC, ST_Distance(location, ST_SetSRID(ST_MakePoint($3, $4), 4326)) ASC
+       LIMIT 1`,
+      [category, reporter_id, lng, lat, DEDUP_RADIUS_METRES]
+    );
+    const candidate = candidateResult.rows[0] || null;
+
+    if (candidate) {
+      // MERGE BRANCH: Merge into existing issue
+
+      // 1. Update report_count and priority_score
+      await client.query(
+        `UPDATE issues SET report_count = report_count + 1, priority_score = priority_score + $1, updated_at = NOW() WHERE id = $2`,
+        [DEDUP_PRIORITY_BOOST, candidate.id]
+      );
+
+      // 2. Insert submitted images linked to existing issue
+      if (image_urls && image_urls.length > 0) {
+        for (let url of image_urls) {
+          await client.query(
+            `INSERT INTO issue_images (issue_id, uploader_id, image_url, image_type)
+             VALUES ($1, $2, $3, 'REPORT')`,
+            [candidate.id, reporter_id, url]
+          );
+        }
       }
+
+      // 3. Add submitter to watchers
+      await client.query(
+        `INSERT INTO watchers (issue_id, user_id) VALUES ($1, $2) ON CONFLICT (issue_id, user_id) DO NOTHING`,
+        [candidate.id, reporter_id]
+      );
+
+      await client.query('COMMIT');
+
+      return res.status(200).json({
+        merged: true,
+        message: 'Your report has been merged with an existing tracked issue. Its priority has been boosted.',
+        issue: { id: candidate.id, short_id: candidate.short_id },
+        report_count: candidate.report_count + 1
+      });
+    } else {
+      // NEW ISSUE BRANCH: Create a new issue record
+
+      // 1. Insert main issue record
+      const issueResult = await client.query(
+        `INSERT INTO issues (short_id, reporter_id, category, description, location, address, priority_score)
+         VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, 0)
+         RETURNING id, short_id`,
+        [short_id, reporter_id, category, description, lng, lat, address]
+      );
+      
+      const newIssueId = issueResult.rows[0].id;
+
+      // 2. Insert uploaded images into dependent table
+      if (image_urls && image_urls.length > 0) {
+        for (let url of image_urls) {
+          await client.query(
+            `INSERT INTO issue_images (issue_id, uploader_id, image_url, image_type)
+             VALUES ($1, $2, $3, 'REPORT')`,
+            [newIssueId, reporter_id, url]
+          );
+        }
+      }
+
+      // 3. AUTO-WATCH: Automatically add the reporter to the watchers table 
+      // We use ON CONFLICT DO NOTHING just as a safe database practice
+      await client.query(
+        `INSERT INTO watchers (issue_id, user_id) 
+         VALUES ($1, $2)
+         ON CONFLICT (issue_id, user_id) DO NOTHING`,
+        [newIssueId, reporter_id]
+      );
+
+      await client.query('COMMIT'); // Save transaction
+
+      res.status(201).json({
+        merged: false,
+        message: 'Issue reported successfully. You are now watching this issue for updates.',
+        issue: { id: newIssueId, short_id: issueResult.rows[0].short_id }
+      });
     }
-
-    // 3. AUTO-WATCH: Automatically add the reporter to the watchers table 
-    // We use ON CONFLICT DO NOTHING just as a safe database practice
-    await client.query(
-      `INSERT INTO watchers (issue_id, user_id) 
-       VALUES ($1, $2)
-       ON CONFLICT (issue_id, user_id) DO NOTHING`,
-      [newIssueId, reporter_id]
-    );
-
-    await client.query('COMMIT'); // Save transaction
-
-    res.status(201).json({
-      message: 'Issue reported successfully. You are now watching this issue for updates.',
-      issue: { id: newIssueId, short_id: issueResult.rows[0].short_id }
-    });
 
   } catch (err) {
     await client.query('ROLLBACK'); // Undo if error occurs
@@ -314,5 +374,116 @@ const unwatchIssue = async (req, res) => {
   }
 };
 
-// BUG FIX: watchIssue and unwatchIssue were defined but missing from exports
-module.exports = { createIssue, updateIssueStatus, getNearbyIssues, watchIssue, unwatchIssue };
+/**
+ * GET /api/issues/mine
+ * Returns all issues the authenticated user is watching (includes reported + merged).
+ */
+const getMyIssues = async (req, res) => {
+  try {
+    const user_id = req.user.id;
+
+    const result = await pool.query(
+      `SELECT 
+        i.id, i.short_id, i.category, i.description, i.status, 
+        i.address, i.priority_score, i.report_count, i.created_at, i.updated_at,
+        (
+          SELECT image_url FROM issue_images 
+          WHERE issue_id = i.id AND image_type = 'REPORT' 
+          ORDER BY uploaded_at LIMIT 1
+        ) as thumbnail
+      FROM issues i
+      INNER JOIN watchers w ON w.issue_id = i.id
+      WHERE w.user_id = $1
+      ORDER BY i.updated_at DESC`,
+      [user_id]
+    );
+
+    res.status(200).json({
+      count: result.rows.length,
+      data: result.rows,
+    });
+  } catch (err) {
+    console.error('[getMyIssues]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch your issues.' });
+  }
+};
+
+/**
+ * POST /api/issues/:id/me-too
+ * Allows a citizen to endorse an existing issue ("Me too"), boosting its priority.
+ */
+const meToo = async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const issue_id = req.params.id;
+    const user_id = req.user.id;
+
+    // 1. Check issue exists and is open
+    const issueCheck = await pool.query(
+      'SELECT id, reporter_id, status, report_count, priority_score FROM issues WHERE id = $1',
+      [issue_id]
+    );
+    if (issueCheck.rows.length === 0) {
+      client.release();
+      return res.status(404).json({ error: 'ISSUE_NOT_FOUND', message: 'Issue not found.' });
+    }
+
+    const issue = issueCheck.rows[0];
+
+    // 2. Check if issue is closed/rejected/resolved
+    if (['CLOSED', 'REJECTED', 'RESOLVED'].includes(issue.status)) {
+      client.release();
+      return res.status(400).json({ error: 'ISSUE_CLOSED', message: 'This issue is no longer accepting endorsements.' });
+    }
+
+    // 3. Check if user is the original reporter
+    if (issue.reporter_id === user_id) {
+      client.release();
+      return res.status(400).json({ error: 'SELF_ENDORSE', message: 'You cannot endorse your own issue.' });
+    }
+
+    // 4. Check if user is already a watcher (already endorsed)
+    const watcherCheck = await pool.query(
+      'SELECT 1 FROM watchers WHERE issue_id = $1 AND user_id = $2',
+      [issue_id, user_id]
+    );
+    if (watcherCheck.rows.length > 0) {
+      client.release();
+      return res.status(200).json({ message: 'You have already endorsed this issue.' });
+    }
+
+    // 5. Execute endorsement within a transaction
+    await client.query('BEGIN');
+
+    await client.query(
+      `UPDATE issues SET report_count = report_count + 1, priority_score = priority_score + $1, updated_at = NOW() WHERE id = $2`,
+      [DEDUP_PRIORITY_BOOST, issue_id]
+    );
+
+    await client.query(
+      `INSERT INTO watchers (issue_id, user_id) VALUES ($1, $2) ON CONFLICT (issue_id, user_id) DO NOTHING`,
+      [issue_id, user_id]
+    );
+
+    await client.query('COMMIT');
+
+    const newReportCount = issue.report_count + 1;
+    const newPriorityScore = parseFloat(issue.priority_score) + DEDUP_PRIORITY_BOOST;
+
+    res.status(200).json({
+      message: "Thanks! You've endorsed this issue. Its priority has been boosted.",
+      report_count: newReportCount,
+      priority_score: newPriorityScore
+    });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[meToo]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to endorse issue.' });
+  } finally {
+    client.release();
+  }
+};
+
+module.exports = { createIssue, updateIssueStatus, getNearbyIssues, getMyIssues, watchIssue, unwatchIssue, meToo };

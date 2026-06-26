@@ -13,6 +13,7 @@ import CitizenDashboard from "./pages/CitizenDashboard";
 import FieldWorkerDashboard from "./pages/FieldWorkerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ReportWizard from "./pages/ReportWizard";
+import MyComplaints from "./pages/MyComplaints";
 
 
 export default function App() {
@@ -53,6 +54,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={["CITIZEN"]}>
             <ReportWizard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/citizen/complaints"
+        element={
+          <ProtectedRoute roles={["CITIZEN"]}>
+            <MyComplaints />
           </ProtectedRoute>
         }
       />
