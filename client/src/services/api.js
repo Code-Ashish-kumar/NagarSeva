@@ -18,5 +18,17 @@ export const endpoints = {
   ME_TOO_API:              (id) => BASE_URL + "/issues/" + id + "/me-too",
   // UPLOAD ENDPOINTS
   UPLOAD_SIGNATURE_API:    BASE_URL + "/upload/signature",
+  // SUPER ADMIN ENDPOINTS
+  SA_STATS_API:            BASE_URL + "/super-admin/stats",
+  SA_QUEUE_API:            BASE_URL + "/super-admin/queue",
+  SA_ISSUE_DETAIL_API:     (id) => BASE_URL + "/super-admin/issues/" + id + "/detail",
+  SA_VERIFY_API:           (id) => BASE_URL + "/super-admin/issues/" + id + "/verify",
+  SA_REJECT_API:           (id) => BASE_URL + "/super-admin/issues/" + id + "/reject",
+  SA_DEPARTMENTS_API:      BASE_URL + "/super-admin/departments",
+  // ADMIN ENDPOINTS
+  ADMIN_STATS_API:         BASE_URL + "/admin/stats",
+  ADMIN_QUEUE_API:         BASE_URL + "/admin/queue",
+  ADMIN_WORKERS_API:       BASE_URL + "/admin/workers",
+  ADMIN_ASSIGN_API:        (id) => BASE_URL + "/admin/issues/" + id + "/assign",
 };
 

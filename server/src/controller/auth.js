@@ -37,7 +37,7 @@ function generateOtp() {
 /** Sign a JWT token stored in an httpOnly cookie */
 function generateToken(user) {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
+    { id: user.id, email: user.email, role: user.role, department_id: user.department_id || null },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
@@ -277,7 +277,7 @@ const login = async (req, res) => {
     const { email, password } = value;
 
     const result = await pool.query(
-      'SELECT id, name, email, password_hash, role, is_verified FROM users WHERE email = $1',
+      'SELECT id, name, email, password_hash, role, is_verified, department_id FROM users WHERE email = $1',
       [email]
     );
 
@@ -320,7 +320,7 @@ const login = async (req, res) => {
 const me = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, role, is_verified, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, role, is_verified, department_id, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
 
@@ -330,7 +330,7 @@ const me = async (req, res) => {
 
     const user = result.rows[0];
     res.status(200).json({
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, department_id: user.department_id },
     });
   } catch (err) {
     console.error('[me]', err);

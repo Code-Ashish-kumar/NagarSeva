@@ -15,6 +15,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ReportWizard from "./pages/ReportWizard";
 import MyComplaints from "./pages/MyComplaints";
 import CityPulse from "./pages/CityPulse";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 
 
 export default function App() {
@@ -85,8 +86,16 @@ export default function App() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute roles={["ADMIN", "SUPER_ADMIN"]}>
+          <ProtectedRoute roles={["ADMIN"]}>
             <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/super-admin"
+        element={
+          <ProtectedRoute roles={["SUPER_ADMIN"]}>
+            <SuperAdminDashboard />
           </ProtectedRoute>
         }
       />

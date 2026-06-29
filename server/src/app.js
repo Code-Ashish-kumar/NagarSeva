@@ -8,6 +8,8 @@ const authRoutes       = require('./routes/auth');
 const issueRoutes      = require('./routes/issue');
 const uploadRoutes     = require('./routes/upload');
 const complaintsRoutes = require('./routes/complaints');
+const superAdminRoutes = require('./routes/superAdmin');
+const adminRoutes      = require('./routes/admin');
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use('/api/auth',       authRoutes);
 app.use('/api/issues',     issueRoutes);
 app.use('/api/upload',     uploadRoutes);
 app.use('/api/complaints', complaintsRoutes);
+app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/admin',       adminRoutes);
 
 // Health check — useful for Railway/Render deploy
 app.get('/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
