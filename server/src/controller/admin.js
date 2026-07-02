@@ -23,13 +23,26 @@ const W_SUCCESS    = parseFloat(process.env.WORKER_W_SUCCESS)    || 0.4;
 const W_BUSYNESS   = parseFloat(process.env.WORKER_W_BUSYNESS)  || 0.3;
 
 /**
- * Helper: Get the admin's department_id from JWT (fast) or DB fallback (one query).
- * Handles the case where the JWT was issued before department_id was added.
+ * Helper: Get the admin's department_id and designation from JWT (fast)
+ * or DB fallback (one query). Always reads from DB to ensure designation
+ * is current (not stale in an old JWT).
  */
+async function getAdminContext(req) {
+  const result = await pool.query(
+    'SELECT department_id, designation FROM users WHERE id = $1',
+    [req.user.id]
+  );
+  const row = result.rows[0];
+  return {
+    dept_id:     row?.department_id || null,
+    designation: row?.designation   || null,
+  };
+}
+
+// Keep backward-compatible alias for other controllers that call getAdminDeptId
 async function getAdminDeptId(req) {
-  if (req.user.department_id) return req.user.department_id;
-  const result = await pool.query('SELECT department_id FROM users WHERE id = $1', [req.user.id]);
-  return result.rows[0]?.department_id || null;
+  const { dept_id } = await getAdminContext(req);
+  return dept_id;
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -40,7 +53,7 @@ async function getAdminDeptId(req) {
  */
 const getDepartmentQueue = async (req, res) => {
   try {
-    const dept_id = await getAdminDeptId(req);
+    const { dept_id, designation: adminDesignation } = await getAdminContext(req);
     if (!dept_id) {
       return res.status(400).json({ error: 'NO_DEPARTMENT', message: 'You are not assigned to a department.' });
     }
@@ -49,6 +62,7 @@ const getDepartmentQueue = async (req, res) => {
       `SELECT 
         i.id, i.short_id, i.category, i.description, i.status,
         i.address, i.priority_score, i.report_count, i.created_at, i.updated_at,
+        i.assigned_admin_designation,
         ST_Y(i.location::geometry) AS lat,
         ST_X(i.location::geometry) AS lng,
         (SELECT image_url FROM issue_images WHERE issue_id = i.id AND image_type = 'REPORT' ORDER BY uploaded_at LIMIT 1) AS thumbnail,
@@ -56,8 +70,12 @@ const getDepartmentQueue = async (req, res) => {
       FROM issues i
       WHERE i.department_id = $1
         AND i.status = 'ASSIGNED'
+        AND (
+          i.assigned_admin_designation IS NULL
+          OR i.assigned_admin_designation = $2
+        )
       ORDER BY i.priority_score DESC, i.created_at ASC`,
-      [dept_id]
+      [dept_id, adminDesignation]
     );
 
     res.status(200).json({ count: result.rows.length, data: result.rows });
@@ -88,7 +106,7 @@ const getRankedWorkers = async (req, res) => {
     const result = await pool.query(
       `WITH worker_stats AS (
         SELECT
-          u.id, u.name, u.email,
+          u.id, u.name, u.email, u.designation,
           COUNT(i.id) FILTER (WHERE i.status IN ('RESOLVED', 'CLOSED')) AS resolved_count,
           COUNT(i.id) FILTER (WHERE i.status = 'REJECTED') AS rejected_count,
           COUNT(i.id) FILTER (WHERE i.status = 'IN_PROGRESS') AS active_count,
@@ -97,7 +115,7 @@ const getRankedWorkers = async (req, res) => {
         LEFT JOIN issues i ON i.assigned_to = u.id
         WHERE u.role = 'FIELD_WORKER'
           AND u.department_id = $1
-        GROUP BY u.id, u.name, u.email
+        GROUP BY u.id, u.name, u.email, u.designation
       )
       SELECT *,
         CASE WHEN MAX(total_handled) OVER () = 0 THEN 0
@@ -144,9 +162,10 @@ const assignWorker = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // Verify issue exists, is ASSIGNED, and belongs to this admin's department
+    // Verify issue exists, is ASSIGNED, and belongs to this admin's department.
+    // FOR UPDATE locks the row so two concurrent admins cannot assign the same issue simultaneously.
     const issue = await client.query(
-      'SELECT id, status, department_id FROM issues WHERE id = $1',
+      'SELECT id, status, department_id FROM issues WHERE id = $1 FOR UPDATE',
       [id]
     );
     if (issue.rows.length === 0) {

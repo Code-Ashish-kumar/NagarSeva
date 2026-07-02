@@ -3,8 +3,8 @@
  *
  * All routes require SUPER_ADMIN role.
  */
-const express   = require('express');
-const auth      = require('../middleware/auth');
+const express = require('express');
+const auth = require('../middleware/auth');
 const roleGuard = require('../middleware/roleGuard');
 const {
   getTriagingQueue,
@@ -15,6 +15,9 @@ const {
   createDepartment,
   deleteDepartment,
   getStats,
+  createEmployee,
+  getEmployees,
+  getDesignationsConfig,
 } = require('../controller/superAdmin');
 
 const router = express.Router();
@@ -41,5 +44,12 @@ router.patch('/issues/:id/reject', rejectIssue);
 router.get('/departments', getDepartments);
 router.post('/departments', createDepartment);
 router.delete('/departments/:id', deleteDepartment);
+
+// Employee management (ADMIN + FIELD_WORKER accounts)
+router.get('/employees', getEmployees);
+router.post('/employees', createEmployee);
+
+// Designation vocabulary (for dynamic dropdowns on frontend)
+router.get('/designations', getDesignationsConfig);
 
 module.exports = router;

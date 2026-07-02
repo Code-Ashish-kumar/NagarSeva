@@ -9,4 +9,4 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_audit_issue ON audit_logs (issue_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_issue ON audit_logs (issue_id, created_at);

@@ -175,7 +175,9 @@
 }
 .admin-worker-info { display: flex; flex-direction: column; gap: 2px; }
 .admin-worker-info strong { font-size: 0.85rem; color: var(--color-primary); }
+.admin-worker-designation { font-size: 0.7rem; color: var(--color-muted); font-style: italic; }
 .admin-worker-score { font-size: 0.7rem; color: var(--color-accent); font-weight: 600; }
+.admin-routed-badge { font-size: 0.7rem; color: #2dd4bf; font-weight: 600; margin: 2px 0 0; letter-spacing: 0.01em; }
 
 .admin-assign-btn {
   padding: 5px 12px; border-radius: var(--radius-sm); border: none;

@@ -320,7 +320,12 @@ const login = async (req, res) => {
 const me = async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, email, role, is_verified, department_id, created_at FROM users WHERE id = $1',
+      `SELECT u.id, u.name, u.email, u.role, u.is_verified,
+              u.department_id, u.designation, u.created_at,
+              d.name AS department_name
+       FROM users u
+       LEFT JOIN departments d ON u.department_id = d.id
+       WHERE u.id = $1`,
       [req.user.id]
     );
 
@@ -330,7 +335,15 @@ const me = async (req, res) => {
 
     const user = result.rows[0];
     res.status(200).json({
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, department_id: user.department_id },
+      user: {
+        id:              user.id,
+        name:            user.name,
+        email:           user.email,
+        role:            user.role,
+        department_id:   user.department_id,
+        designation:     user.designation,
+        department_name: user.department_name,
+      },
     });
   } catch (err) {
     console.error('[me]', err);

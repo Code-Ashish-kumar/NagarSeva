@@ -10,13 +10,16 @@
  * - Dashboard stats
  */
 const Joi = require('joi');
+const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
 const { sendOtpEmail } = require('../config/mailer');
+const { isValidDesignation } = require('../config/designations');
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
 const verifySchema = Joi.object({
-  department_id: Joi.number().integer().positive().required(),
+  department_id:          Joi.number().integer().positive().required(),
+  admin_designation:      Joi.string().min(2).max(100).trim().optional().allow(null, ''),
 });
 
 const rejectSchema = Joi.object({
@@ -25,6 +28,15 @@ const rejectSchema = Joi.object({
 
 const createDeptSchema = Joi.object({
   name: Joi.string().min(2).max(100).trim().required(),
+});
+
+const createEmployeeSchema = Joi.object({
+  name:          Joi.string().min(2).max(100).trim().required(),
+  email:         Joi.string().email().lowercase().trim().required(),
+  password:      Joi.string().min(8).max(72).required(),
+  role:          Joi.string().valid('ADMIN', 'FIELD_WORKER').required(),
+  department_id: Joi.number().integer().positive().required(),
+  designation:   Joi.string().min(2).max(100).trim().optional(),
 });
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -129,7 +141,7 @@ const verifyIssue = async (req, res) => {
       return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
     }
 
-    const { department_id } = value;
+    const { department_id, admin_designation } = value;
 
     await client.query('BEGIN');
 
@@ -144,29 +156,51 @@ const verifyIssue = async (req, res) => {
       return res.status(400).json({ error: 'INVALID_STATUS', message: `Issue is ${issue.rows[0].status}, not SUBMITTED.` });
     }
 
-    // Verify department exists
-    const dept = await client.query('SELECT id, name FROM departments WHERE id = $1 AND deleted_at IS NULL', [department_id]);
+    // Verify department exists and get dept_type for designation validation
+    const dept = await client.query('SELECT id, name, dept_type FROM departments WHERE id = $1 AND deleted_at IS NULL', [department_id]);
     if (dept.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'INVALID_DEPT', message: 'Department not found or deleted.' });
     }
+    const deptRow = dept.rows[0];
 
-    // Update issue
+    // Validate admin_designation against the department's type vocabulary
+    if (admin_designation && deptRow.dept_type) {
+      if (!isValidDesignation(deptRow.dept_type, 'ADMIN', admin_designation)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          error: 'INVALID_DESIGNATION',
+          message: `"${admin_designation}" is not a valid admin designation for ${deptRow.name}.`,
+        });
+      }
+    }
+
+    // Update issue — set department, admin designation (nullable), status
     await client.query(
-      `UPDATE issues SET status = 'ASSIGNED', department_id = $1, updated_at = NOW() WHERE id = $2`,
-      [department_id, id]
+      `UPDATE issues
+       SET status = 'ASSIGNED', department_id = $1, assigned_admin_designation = $2, updated_at = NOW()
+       WHERE id = $3`,
+      [department_id, admin_designation || null, id]
     );
 
     // Audit log
+    const noteText = admin_designation
+      ? `Verified and routed to ${deptRow.name} → ${admin_designation}`
+      : `Verified and routed to ${deptRow.name}`;
+
     await client.query(
       `INSERT INTO audit_logs (issue_id, from_status, to_status, changed_by, note, metadata)
        VALUES ($1, 'SUBMITTED', 'ASSIGNED', $2, $3, $4)`,
-      [id, req.user.id, `Verified and routed to ${dept.rows[0].name}`, JSON.stringify({ department_id, department_name: dept.rows[0].name })]
+      [id, req.user.id, noteText, JSON.stringify({ department_id, department_name: deptRow.name, admin_designation: admin_designation || null })]
     );
 
     await client.query('COMMIT');
 
-    res.status(200).json({ message: `Issue verified and assigned to ${dept.rows[0].name}.` });
+    res.status(200).json({
+      message: admin_designation
+        ? `Issue verified and assigned to ${deptRow.name} (${admin_designation}).`
+        : `Issue verified and assigned to ${deptRow.name}.`,
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[verifyIssue]', err);
@@ -253,9 +287,10 @@ const rejectIssue = async (req, res) => {
 const getDepartments = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT d.id, d.name, d.created_at,
+      `SELECT d.id, d.name, d.dept_type, d.created_at,
         (SELECT COUNT(*) FROM issues WHERE department_id = d.id AND status NOT IN ('CLOSED', 'REJECTED')) AS active_issues,
-        (SELECT COUNT(*) FROM users WHERE department_id = d.id AND role = 'FIELD_WORKER') AS worker_count
+        (SELECT COUNT(*) FROM users WHERE department_id = d.id AND role = 'FIELD_WORKER') AS worker_count,
+        (SELECT COUNT(*) FROM users WHERE department_id = d.id AND role = 'ADMIN') AS admin_count
       FROM departments d
       WHERE d.deleted_at IS NULL
       ORDER BY d.name`
@@ -352,6 +387,101 @@ const getStats = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/super-admin/employees
+ * Create an ADMIN or FIELD_WORKER account and assign them to a department.
+ * Validates that the designation is appropriate for the department's type and role.
+ */
+const createEmployee = async (req, res) => {
+  try {
+    const { error, value } = createEmployeeSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+    }
+
+    const { name, email, password, role, department_id, designation } = value;
+
+    // Verify department exists and get its dept_type
+    const deptResult = await pool.query(
+      'SELECT id, name, dept_type FROM departments WHERE id = $1 AND deleted_at IS NULL',
+      [department_id]
+    );
+    if (deptResult.rows.length === 0) {
+      return res.status(400).json({ error: 'INVALID_DEPT', message: 'Department not found or deleted.' });
+    }
+    const dept = deptResult.rows[0];
+
+    // Validate designation against the department type + role vocabulary
+    if (designation && dept.dept_type) {
+      if (!isValidDesignation(dept.dept_type, role, designation)) {
+        return res.status(400).json({
+          error: 'INVALID_DESIGNATION',
+          message: `"${designation}" is not a valid designation for ${role} in ${dept.name}.`,
+        });
+      }
+    }
+
+    // Check email is not already taken
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'EMAIL_TAKEN', message: 'An account with this email already exists.' });
+    }
+
+    // Hash password and insert employee
+    const password_hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password_hash, role, department_id, designation, is_verified)
+       VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+       RETURNING id, name, email, role, designation, department_id`,
+      [name, email, password_hash, role, department_id, designation || null]
+    );
+
+    const employee = result.rows[0];
+    res.status(201).json({
+      message: `${role === 'ADMIN' ? 'Admin' : 'Field Worker'} "${name}" created and assigned to ${dept.name}.`,
+      employee: { ...employee, department_name: dept.name },
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'EMAIL_TAKEN', message: 'An account with this email already exists.' });
+    }
+    console.error('[createEmployee]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to create employee.' });
+  }
+};
+
+/**
+ * GET /api/super-admin/employees
+ * List all non-citizen users (ADMINs and FIELD_WORKERs) with their department.
+ */
+const getEmployees = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.email, u.role, u.designation, u.created_at,
+              d.id AS department_id, d.name AS department_name, d.dept_type
+       FROM users u
+       LEFT JOIN departments d ON u.department_id = d.id
+       WHERE u.role IN ('ADMIN', 'FIELD_WORKER')
+       ORDER BY u.role, d.name, u.name`
+    );
+    res.status(200).json({ data: result.rows });
+  } catch (err) {
+    console.error('[getEmployees]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch employees.' });
+  }
+};
+
+/**
+ * GET /api/super-admin/designations
+ * Returns the full designation vocabulary keyed by dept_type.
+ * Frontend uses this to dynamically build the admin designation dropdown
+ * after the user selects a department (which carries a dept_type).
+ */
+const getDesignationsConfig = (req, res) => {
+  const { DESIGNATIONS } = require('../config/designations');
+  res.status(200).json({ data: DESIGNATIONS });
+};
+
 // ─── Email Helper ────────────────────────────────────────────────────────────
 
 async function sendRejectionEmail(email, name, shortId, category, reason) {
@@ -397,4 +527,8 @@ module.exports = {
   createDepartment,
   deleteDepartment,
   getStats,
+  createEmployee,
+  getEmployees,
+  getDesignationsConfig,
 };
+

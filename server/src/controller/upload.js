@@ -30,7 +30,11 @@ const getUploadSignature = async (req, res) => {
       process.env.CLOUDINARY_API_SECRET
     );
 
+
+    // console.log(signature)
     // 4. Send the required details back to the frontend
+
+    console.log("Signature sent successfully")
     res.status(200).json({
       signature,
       timestamp,
