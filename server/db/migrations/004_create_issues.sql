@@ -27,6 +27,6 @@ CREATE TABLE IF NOT EXISTS issues (
 );
 
 -- THE KEY INDEX: makes spatial queries fast
-CREATE INDEX idx_issues_location ON issues USING GIST (location);
-CREATE INDEX idx_issues_status ON issues (status);
-CREATE INDEX idx_issues_category ON issues (category);
+CREATE INDEX IF NOT EXISTS idx_issues_location ON issues USING GIST (location);
+CREATE INDEX IF NOT EXISTS idx_issues_status ON issues (status);
+CREATE INDEX IF NOT EXISTS idx_issues_category ON issues (category);

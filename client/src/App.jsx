@@ -12,6 +12,7 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ForgotPassword from "./pages/ForgotPassword";
 import CitizenDashboard from "./pages/CitizenDashboard";
 import FieldWorkerDashboard from "./pages/FieldWorkerDashboard";
+import IssueWorkPage from "./pages/IssueWorkPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ReportWizard from "./pages/ReportWizard";
 import MyComplaints from "./pages/MyComplaints";
@@ -83,6 +84,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={["FIELD_WORKER"]}>
             <FieldWorkerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/field-worker/issues/:id"
+        element={
+          <ProtectedRoute roles={["FIELD_WORKER"]}>
+            <IssueWorkPage />
           </ProtectedRoute>
         }
       />

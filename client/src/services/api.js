@@ -28,11 +28,18 @@ export const endpoints = {
   SA_VERIFY_API:           (id) => BASE_URL + "/super-admin/issues/" + id + "/verify",
   SA_REJECT_API:           (id) => BASE_URL + "/super-admin/issues/" + id + "/reject",
   SA_DEPARTMENTS_API:      BASE_URL + "/super-admin/departments",
+  SA_DESIGNATIONS_API:     BASE_URL + "/super-admin/designations",
   SA_STAFF_API:            BASE_URL + "/super-admin/staff",
   // ADMIN ENDPOINTS
   ADMIN_STATS_API:         BASE_URL + "/admin/stats",
   ADMIN_QUEUE_API:         BASE_URL + "/admin/queue",
   ADMIN_WORKERS_API:       BASE_URL + "/admin/workers",
   ADMIN_ASSIGN_API:        (id) => BASE_URL + "/admin/issues/" + id + "/assign",
+  // FIELD WORKER ENDPOINTS
+  FW_ACTIVE_API:           BASE_URL + "/field-worker/issues",
+  FW_RESOLVED_API:         BASE_URL + "/field-worker/issues/resolved",
+  FW_ISSUE_DETAIL_API:     (id) => BASE_URL + "/field-worker/issues/" + id,
+  FW_START_API:            (id) => BASE_URL + "/field-worker/issues/" + id + "/start",
+  FW_RESOLVE_API:          (id) => BASE_URL + "/field-worker/issues/" + id + "/resolve",
 };
 

@@ -135,6 +135,9 @@ export default function AdminDashboard() {
                     <span className="sa-queue-priority">⬆ {issue.priority_score} · 👥 {issue.report_count} · 📅 {issue.days_pending}d</span>
                   </div>
                   <p className="sa-queue-category">{CATEGORY_LABELS[issue.category] || issue.category}</p>
+                  {issue.assigned_admin_designation && (
+                    <p className="admin-routed-badge">🎯 Routed to: {issue.assigned_admin_designation}</p>
+                  )}
                   <p className="sa-queue-address">{issue.address || '—'}</p>
                   <button
                     className="admin-allocate-btn"
@@ -154,6 +157,7 @@ export default function AdminDashboard() {
                           <div key={w.id} className="admin-worker-row">
                             <div className="admin-worker-info">
                               <strong>{w.name}</strong>
+                              {w.designation && <span className="admin-worker-designation">{w.designation}</span>}
                               <span className="admin-worker-score">Score: {w.worker_score}</span>
                               <WorkloadBadge count={w.active_count} />
                             </div>
@@ -181,6 +185,7 @@ export default function AdminDashboard() {
           {workers.map((w) => (
             <div key={w.id} className="admin-resource-card">
               <strong>{w.name}</strong>
+              {w.designation && <span className="admin-worker-designation">{w.designation}</span>}
               <WorkloadBadge count={w.active_count} />
               <span className="admin-resource-resolved">{w.resolved_count} resolved</span>
             </div>

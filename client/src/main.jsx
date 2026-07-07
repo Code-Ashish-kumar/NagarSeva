@@ -9,6 +9,7 @@ import "./styles/complaint.css";
 import "./styles/citypulse.css";
 import "./styles/superadmin.css";
 import "./styles/landing.css";
+import "./styles/fieldworker.css";
 
 
 ReactDOM.createRoot(document.getElementById("root")).render(

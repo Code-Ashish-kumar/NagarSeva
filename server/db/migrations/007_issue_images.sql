@@ -16,4 +16,4 @@ CREATE TABLE IF NOT EXISTS issue_images (
 );
 
 -- Index for fast retrieval when loading an issue page
-CREATE INDEX idx_issue_images_issue_id ON issue_images(issue_id);
+CREATE INDEX IF NOT EXISTS idx_issue_images_issue_id ON issue_images(issue_id);

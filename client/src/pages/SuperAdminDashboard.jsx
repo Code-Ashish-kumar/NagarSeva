@@ -31,6 +31,7 @@ export default function SuperAdminDashboard() {
   const [stats, setStats]           = useState(null);
   const [queue, setQueue]           = useState([]);
   const [departments, setDepts]     = useState([]);
+  const [designations, setDesignations] = useState({}); // full vocab map
   const [loading, setLoading]       = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail]         = useState(null);
@@ -38,6 +39,7 @@ export default function SuperAdminDashboard() {
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectReason, setRejectReason]   = useState('');
   const [selectedDept, setSelectedDept]   = useState('');
+  const [adminDesignation, setAdminDesignation] = useState('');
   const [view, setView]             = useState('queue'); // 'queue' | 'review' | 'depts' | 'staff'
   const [newDeptName, setNewDeptName]     = useState('');
   const [staff, setStaff]                 = useState([]);
@@ -49,16 +51,18 @@ export default function SuperAdminDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [statsRes, queueRes, deptRes, staffRes] = await Promise.all([
+      const [statsRes, queueRes, deptRes, staffRes, desigRes] = await Promise.all([
         apiConnector('GET', endpoints.SA_STATS_API),
         apiConnector('GET', endpoints.SA_QUEUE_API),
         apiConnector('GET', endpoints.SA_DEPARTMENTS_API),
         apiConnector('GET', endpoints.SA_STAFF_API),
+        apiConnector('GET', endpoints.SA_DESIGNATIONS_API).catch(() => ({ data: {} })),
       ]);
       setStats(statsRes);
       setQueue(queueRes.data || []);
       setDepts(deptRes.data || []);
       setStaff(staffRes.data || []);
+      setDesignations(desigRes.data || {});
     } catch (err) {
       console.error('[SuperAdmin] fetch error:', err);
     } finally {
@@ -76,21 +80,17 @@ export default function SuperAdminDashboard() {
     return () => clearInterval(interval);
   }, [view, fetchData]);
 
-  // Open review modal
-  async function openReview(issueId) {
+  function openReview(issueId) {
     setSelectedId(issueId);
     setView('review');
     setDetailLoading(true);
     setRejectReason('');
     setSelectedDept('');
-    try {
-      const res = await apiConnector('GET', endpoints.SA_ISSUE_DETAIL_API(issueId));
-      setDetail(res);
-    } catch (err) {
-      console.error('[detail]', err);
-    } finally {
-      setDetailLoading(false);
-    }
+    setAdminDesignation('');
+    apiConnector('GET', endpoints.SA_ISSUE_DETAIL_API(issueId))
+      .then(setDetail)
+      .catch((err) => console.error('[detail]', err))
+      .finally(() => setDetailLoading(false));
   }
 
   // Verify action
@@ -98,7 +98,10 @@ export default function SuperAdminDashboard() {
     if (!selectedDept) return alert('Please select a department.');
     setActionLoading(true);
     try {
-      await apiConnector('PATCH', endpoints.SA_VERIFY_API(selectedId), { department_id: parseInt(selectedDept) });
+      await apiConnector('PATCH', endpoints.SA_VERIFY_API(selectedId), {
+        department_id: parseInt(selectedDept),
+        admin_designation: adminDesignation || null,
+      });
       setView('queue');
       setDetail(null);
       fetchData();
@@ -278,14 +281,43 @@ export default function SuperAdminDashboard() {
 
               {/* Actions */}
               <div className="sa-review-actions">
-                {/* Verify */}
+                  {/* Verify */}
                 <div className="sa-action-box sa-action-verify">
                   <h3>✅ Verify & Route</h3>
-                  <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="sa-select">
+
+                  {/* Step 1: Department */}
+                  <select
+                    value={selectedDept}
+                    onChange={(e) => { setSelectedDept(e.target.value); setAdminDesignation(''); }}
+                    className="sa-select"
+                  >
                     <option value="">Select department…</option>
                     {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                  <button className="sa-btn-verify" onClick={handleVerify} disabled={actionLoading || !selectedDept}>
+
+                  {/* Step 2: Admin designation — derived from the selected dept's dept_type */}
+                  {(() => {
+                    const selDept = departments.find((d) => String(d.id) === String(selectedDept));
+                    const adminOptions = selDept?.dept_type ? designations[selDept.dept_type]?.ADMIN : null;
+                    if (!selectedDept || !adminOptions?.length) return null;
+                    return (
+                      <select
+                        value={adminDesignation}
+                        onChange={(e) => setAdminDesignation(e.target.value)}
+                        className="sa-select"
+                        style={{ marginTop: 8 }}
+                      >
+                        <option value="">Any admin (no preference)</option>
+                        {adminOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    );
+                  })()}
+
+                  <button
+                    className="sa-btn-verify"
+                    onClick={handleVerify}
+                    disabled={actionLoading || !selectedDept}
+                  >
                     {actionLoading ? '…' : 'Verify & Assign'}
                   </button>
                 </div>

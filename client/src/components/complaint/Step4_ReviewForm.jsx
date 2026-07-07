@@ -53,15 +53,30 @@ function SeverityBadge({ severity }) {
 }
 
 /**
+ * Convert a base64 string to a Blob object.
+ */
+function base64ToBlob(base64, mimeType) {
+  const byteChars = atob(base64);
+  const byteNums  = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNums[i] = byteChars.charCodeAt(i);
+  }
+  return new Blob([new Uint8Array(byteNums)], { type: mimeType });
+}
+
+/**
  * Upload a single base64 image to Cloudinary using a signed upload.
  */
 async function uploadToCloudinary(base64, mimeType, signatureData) {
   const { signature, timestamp, folder, cloud_name, api_key } = signatureData;
 
-  const dataUri = `data:${mimeType};base64,${base64}`;
+  // Convert base64 → Blob so Cloudinary receives a proper binary file,
+  // not a data URI string (data URIs can be rejected by signed upload endpoints).
+  const blob = base64ToBlob(base64, mimeType);
+  const ext  = mimeType.split('/')[1] || 'jpg';
 
   const formData = new FormData();
-  formData.append('file', dataUri);
+  formData.append('file', blob, `upload.${ext}`);
   formData.append('api_key', api_key);
   formData.append('timestamp', String(timestamp));
   formData.append('signature', signature);

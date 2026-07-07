@@ -18,6 +18,7 @@ const {
   createStaff,
   getStaffList,
   resendCredentials,
+  getDesignationsConfig,
 } = require('../controller/superAdmin');
 
 const router = express.Router();
@@ -49,5 +50,8 @@ router.delete('/departments/:id', deleteDepartment);
 router.get('/staff', getStaffList);
 router.post('/staff', createStaff);
 router.post('/staff/:id/resend-credentials', resendCredentials);
+
+// Designation vocabulary (for dynamic dropdowns)
+router.get('/designations', getDesignationsConfig);
 
 module.exports = router;
