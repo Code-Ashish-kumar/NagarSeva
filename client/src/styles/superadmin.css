@@ -194,3 +194,30 @@
 }
 .admin-resource-card strong { font-size: 0.85rem; color: var(--color-primary); }
 .admin-resource-resolved { font-size: 0.7rem; color: var(--color-muted); }
+
+
+/* ── Staff Management ────────────────────────────────────── */
+.sa-staff-form {
+  background: var(--color-surface); border: 1px solid var(--color-elevated);
+  border-radius: var(--radius-md); padding: 20px; margin-bottom: 20px;
+}
+.sa-staff-form-title {
+  font-size: 0.85rem; font-weight: 700; color: var(--color-primary); margin-bottom: 14px;
+}
+.sa-staff-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.sa-staff-field {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.sa-staff-field label {
+  font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--color-muted);
+}
+.sa-staff-msg {
+  font-size: 0.8rem; margin-top: 10px; font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .sa-staff-grid { grid-template-columns: 1fr; }
+}

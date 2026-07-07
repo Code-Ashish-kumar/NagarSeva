@@ -9,6 +9,9 @@ export const endpoints = {
   REFRESH_API:             BASE_URL + "/auth/refresh",
   ME_API:                  BASE_URL + "/auth/me",
   LOGOUT_API:              BASE_URL + "/auth/logout",
+  FORGOT_PASSWORD_API:     BASE_URL + "/auth/forgot-password",
+  VERIFY_RESET_OTP_API:   BASE_URL + "/auth/verify-reset-otp",
+  RESET_PASSWORD_API:      BASE_URL + "/auth/reset-password",
   // COMPLAINT ENDPOINTS
   ANALYZE_COMPLAINT_API:   BASE_URL + "/complaints/analyze",
   // ISSUE ENDPOINTS
@@ -25,6 +28,7 @@ export const endpoints = {
   SA_VERIFY_API:           (id) => BASE_URL + "/super-admin/issues/" + id + "/verify",
   SA_REJECT_API:           (id) => BASE_URL + "/super-admin/issues/" + id + "/reject",
   SA_DEPARTMENTS_API:      BASE_URL + "/super-admin/departments",
+  SA_STAFF_API:            BASE_URL + "/super-admin/staff",
   // ADMIN ENDPOINTS
   ADMIN_STATS_API:         BASE_URL + "/admin/stats",
   ADMIN_QUEUE_API:         BASE_URL + "/admin/queue",

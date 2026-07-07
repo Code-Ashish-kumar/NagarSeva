@@ -8,6 +8,7 @@ import "./styles/globals.css";
 import "./styles/complaint.css";
 import "./styles/citypulse.css";
 import "./styles/superadmin.css";
+import "./styles/landing.css";
 
 
 ReactDOM.createRoot(document.getElementById("root")).render(

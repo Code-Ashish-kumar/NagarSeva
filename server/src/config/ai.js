@@ -14,6 +14,7 @@
  * Retry strategy: Exponential backoff with full jitter on 429/503 errors.
  */
 const Groq = require('groq-sdk');
+const { getDepartmentNames } = require('./departmentCache');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -38,8 +39,9 @@ function getBackoffDelay(attempt) {
 
 /**
  * Build the system + user prompt for civic complaint analysis.
+ * Accepts dynamic department list from the in-memory cache.
  */
-function buildPrompt(description, location, imageCount) {
+function buildPrompt(description, location, imageCount, departments) {
   const locationText = location
     ? `Location coordinates: ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}${location.address ? ` (${location.address})` : ''}.`
     : 'Location: not provided.';
@@ -47,6 +49,9 @@ function buildPrompt(description, location, imageCount) {
   const imageNote = imageCount > 1
     ? `You have been provided ${imageCount} images of the same civic issue from different angles. Analyse ALL images together to form a comprehensive assessment.`
     : 'Analyse the provided image and classify whether it shows a genuine civic infrastructure issue.';
+
+  // Build the department enum dynamically from the cached list
+  const deptList = departments.map(d => `"${d}"`).join(', ');
 
   const systemPrompt = `You are an AI system for a civic issue reporting platform called NagarSeva, used in Indian cities. You analyse images of civic infrastructure problems and return structured JSON assessments.`;
 
@@ -60,12 +65,17 @@ Respond ONLY with a valid JSON object matching this exact schema — no markdown
 {
   "is_valid_civic_issue": <boolean — true if this is a real civic infrastructure problem visible in the image(s)>,
   "rejection_reason": <string if is_valid_civic_issue is false, otherwise null>,
-  "category": <one of: "POTHOLE", "STREETLIGHT", "SEWAGE", "GARBAGE", "WATER_SUPPLY", "ROAD_DAMAGE", "ENCROACHMENT", "STRAY_ANIMALS", "DEAD_ANIMAL", "PUBLIC_TOILET", "DRAIN_BLOCKAGE", "FALLEN_TREE", "ABANDONED_VEHICLE", "AIR_POLLUTION", "OTHER">,
-  "confidence": <float 0.0-1.0 — how confident you are in the category>,
+  "department": <one of: ${deptList}>,
+  "confidence": <float 0.0-1.0 — how confident you are in the department assignment>,
   "severity": <one of: "LOW", "MEDIUM", "HIGH", "CRITICAL">,
   "title": <short 5-10 word title describing the specific issue>,
   "ai_description": <2-3 sentence factual description of what is visible in the image(s) and its civic impact>
 }
+
+Department assignment rules:
+- Choose the MOST relevant department based on what is visible in the image
+- If unsure between two departments, pick the one most directly responsible for fixing the issue
+- If nothing fits well, use the last department in the list (General / Other)
 
 Rejection criteria (set is_valid_civic_issue to false):
 - Image is a selfie, portrait, or does not show infrastructure
@@ -120,7 +130,9 @@ async function callGroq(imageList, systemPrompt, userPrompt) {
  * @returns {Promise<object>} Structured analysis JSON
  */
 async function analyzeComplaint(imageList, description = '', location = null) {
-  const { systemPrompt, userPrompt } = buildPrompt(description, location, imageList.length);
+  // Fetch department list from in-memory cache (O(1) — no DB query unless stale)
+  const departments = await getDepartmentNames();
+  const { systemPrompt, userPrompt } = buildPrompt(description, location, imageList.length, departments);
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {

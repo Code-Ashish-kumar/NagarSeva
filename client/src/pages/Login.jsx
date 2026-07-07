@@ -175,6 +175,12 @@ export default function Login() {
             <button type="submit" className="btn-primary mt-1" disabled={loading}>
               {loading ? <><span className="spinner" />Signing in...</> : 'Sign In →'}
             </button>
+
+            <div className="text-right mt-2">
+              <Link to="/forgot-password" className="text-xs font-medium" style={{ color: 'var(--color-accent)' }}>
+                Forgot password?
+              </Link>
+            </div>
           </form>
 
           <p className="text-center text-sm mt-7" style={{ color: 'var(--color-secondary)' }}>

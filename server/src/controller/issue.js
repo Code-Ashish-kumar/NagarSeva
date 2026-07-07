@@ -7,12 +7,8 @@ const { computeLockKey } = require('../utils/dedupLock');
 // ─── Validation Schemas ──────────────────────────────────────────────────────
 
 const createIssueSchema = Joi.object({
-  category: Joi.string().valid(
-    'POTHOLE', 'STREETLIGHT', 'SEWAGE', 'GARBAGE', 'WATER_SUPPLY', 
-    'ROAD_DAMAGE', 'ENCROACHMENT', 'STRAY_ANIMALS', 'DEAD_ANIMAL', 
-    'PUBLIC_TOILET', 'DRAIN_BLOCKAGE', 'FALLEN_TREE', 'ABANDONED_VEHICLE',
-    'AIR_POLLUTION', 'OTHER'
-  ).required(),
+  category: Joi.string().max(50).default('OTHER'),
+  department: Joi.string().max(100).allow('', null),  // AI-assigned department name
   description: Joi.string().max(1000).allow('', null),
   lat: Joi.number().min(-90).max(90).required(),
   lng: Joi.number().min(-180).max(180).required(),
@@ -64,9 +60,21 @@ const createIssue = async (req, res) => {
       return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
     }
 
-    const { category, description, lat, lng, address, image_urls } = value;
-    const reporter_id = req.user.id; // From auth middleware
+    const { category, department, description, lat, lng, address, image_urls } = value;
+    const reporter_id = req.user.id;
     const short_id = generateShortId();
+
+    // Resolve AI-assigned department name to department_id (if provided)
+    let department_id = null;
+    if (department) {
+      const deptResult = await client.query(
+        'SELECT id FROM departments WHERE name = $1 AND deleted_at IS NULL',
+        [department]
+      );
+      if (deptResult.rows.length > 0) {
+        department_id = deptResult.rows[0].id;
+      }
+    }
 
     await client.query('BEGIN'); // Start transaction
 
@@ -128,10 +136,10 @@ const createIssue = async (req, res) => {
 
       // 1. Insert main issue record
       const issueResult = await client.query(
-        `INSERT INTO issues (short_id, reporter_id, category, description, location, address, priority_score)
-         VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, 0)
+        `INSERT INTO issues (short_id, reporter_id, category, description, location, address, priority_score, department_id)
+         VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, 0, $8)
          RETURNING id, short_id`,
-        [short_id, reporter_id, category, description, lng, lat, address]
+        [short_id, reporter_id, category, description, lng, lat, address, department_id]
       );
       
       const newIssueId = issueResult.rows[0].id;

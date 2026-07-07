@@ -27,6 +27,21 @@ const resendSchema = Joi.object({
   email: Joi.string().email().lowercase().trim().required(),
 });
 
+const forgotPasswordSchema = Joi.object({
+  email: Joi.string().email().lowercase().trim().required(),
+});
+
+const verifyResetOtpSchema = Joi.object({
+  email: Joi.string().email().lowercase().trim().required(),
+  code:  Joi.string().length(6).pattern(/^\d+$/).required(),
+});
+
+const resetPasswordSchema = Joi.object({
+  email:       Joi.string().email().lowercase().trim().required(),
+  code:        Joi.string().length(6).pattern(/^\d+$/).required(),
+  newPassword: Joi.string().min(8).max(72).required(),
+});
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Generate a cryptographically random 6-digit OTP */
@@ -351,4 +366,157 @@ const logout = async (req, res) => {
   res.status(200).json({ message: 'Logged out successfully.' });
 };
 
-module.exports = { register, verifyEmail, resendOtp, login, me, logout };
+/**
+ * POST /api/auth/forgot-password
+ * Step 1: Check if email is registered. If yes, send a RESET_PASSWORD OTP.
+ * Unlike verify-email flow, this DOES tell the user if the email is not registered
+ * (per your requirement — user needs to know if they have an account).
+ */
+const forgotPassword = async (req, res) => {
+  try {
+    const { error, value } = forgotPasswordSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+    }
+
+    const { email } = value;
+
+    // Check if user exists
+    const userResult = await pool.query(
+      'SELECT id, is_verified, name FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        error: 'NOT_REGISTERED',
+        message: 'No account found with this email. Please register first.',
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.is_verified) {
+      return res.status(403).json({
+        error: 'EMAIL_UNVERIFIED',
+        message: 'This account is not verified. Please verify your email first.',
+        email,
+      });
+    }
+
+    // User exists and is verified — send reset OTP
+    const otp = await createOtp(email, 'RESET_PASSWORD');
+    await trySendEmail(email, otp, 'RESET_PASSWORD');
+
+    res.status(200).json({
+      message: 'A 6-digit reset code has been sent to your email.',
+      email,
+      ...(process.env.NODE_ENV === 'development' && { dev_otp: otp }),
+    });
+  } catch (err) {
+    console.error('[forgotPassword]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong.' });
+  }
+};
+
+/**
+ * POST /api/auth/verify-reset-otp
+ * Step 2: Verify the reset OTP (does NOT mark it as used yet).
+ * This confirms the user owns the email before allowing password change.
+ * The OTP remains valid for the next step (reset-password).
+ */
+const verifyResetOtp = async (req, res) => {
+  try {
+    const { error, value } = verifyResetOtpSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+    }
+
+    const { email, code } = value;
+
+    // Find a matching, unused, unexpired OTP
+    const otpResult = await pool.query(
+      `SELECT id FROM otps
+       WHERE email = $1 AND code = $2 AND type = 'RESET_PASSWORD'
+         AND used = FALSE AND expires_at > NOW()
+       LIMIT 1`,
+      [email, code]
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res.status(400).json({
+        error: 'INVALID_OTP',
+        message: 'The code is invalid or has expired. Request a new one.',
+      });
+    }
+
+    // OTP is valid — don't mark as used yet (will be consumed in reset-password step)
+    res.status(200).json({
+      message: 'Code verified. You may now set your new password.',
+      verified: true,
+    });
+  } catch (err) {
+    console.error('[verifyResetOtp]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong.' });
+  }
+};
+
+/**
+ * POST /api/auth/reset-password
+ * Step 3: Set new password. Requires the same OTP (still valid, still unused).
+ * This consumes the OTP, hashes the new password, and forces re-login.
+ */
+const resetPassword = async (req, res) => {
+  try {
+    const { error, value } = resetPasswordSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+    }
+
+    const { email, code, newPassword } = value;
+
+    // Re-validate OTP (defense in depth — even if frontend verified it, server checks again)
+    const otpResult = await pool.query(
+      `SELECT id FROM otps
+       WHERE email = $1 AND code = $2 AND type = 'RESET_PASSWORD'
+         AND used = FALSE AND expires_at > NOW()
+       LIMIT 1`,
+      [email, code]
+    );
+
+    if (otpResult.rows.length === 0) {
+      return res.status(400).json({
+        error: 'INVALID_OTP',
+        message: 'The reset code is invalid or has expired. Please start over.',
+      });
+    }
+
+    // Mark OTP as used (consumed)
+    await pool.query('UPDATE otps SET used = TRUE WHERE id = $1', [otpResult.rows[0].id]);
+
+    // Hash new password and update user
+    const password_hash = await bcrypt.hash(newPassword, 12);
+    const updateResult = await pool.query(
+      `UPDATE users SET password_hash = $1, updated_at = NOW()
+       WHERE email = $2 AND is_verified = TRUE
+       RETURNING id`,
+      [password_hash, email]
+    );
+
+    if (updateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'USER_NOT_FOUND', message: 'User not found.' });
+    }
+
+    // Clear any existing cookie (force re-login with new password)
+    res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
+
+    res.status(200).json({
+      message: 'Password reset successfully! Please log in with your new password.',
+    });
+  } catch (err) {
+    console.error('[resetPassword]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Something went wrong.' });
+  }
+};
+
+module.exports = { register, verifyEmail, resendOtp, login, me, logout, forgotPassword, verifyResetOtp, resetPassword };

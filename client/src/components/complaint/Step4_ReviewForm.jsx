@@ -150,7 +150,8 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
 
       // 3. Create issue in backend
       const result = await apiConnector('POST', endpoints.CREATE_ISSUE_API, {
-        category: aiResult.category,
+        category: aiResult.category || 'OTHER',
+        department: aiResult.department || null,
         description: description || aiResult.ai_description,
         lat: location.lat,
         lng: location.lng,
@@ -203,12 +204,12 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
           </div>
         </div>
 
-        {/* Category */}
+        {/* Department (AI-assigned) */}
         <div className="review-field">
-          <p className="review-field-label">Category</p>
+          <p className="review-field-label">Department</p>
           <EditLink label="Image" stepIndex={1} onGoToStep={onGoToStep} />
           <p className="review-field-value">
-            {CATEGORY_LABELS[aiResult.category] ?? aiResult.category}
+            🏢 {aiResult.department || aiResult.category || 'Unclassified'}
           </p>
         </div>
 

@@ -12,6 +12,7 @@
 const Joi = require('joi');
 const pool = require('../config/db');
 const { sendOtpEmail } = require('../config/mailer');
+const { invalidateCache } = require('../config/departmentCache');
 
 // ─── Validation ──────────────────────────────────────────────────────────────
 
@@ -25,6 +26,13 @@ const rejectSchema = Joi.object({
 
 const createDeptSchema = Joi.object({
   name: Joi.string().min(2).max(100).trim().required(),
+});
+
+const createStaffSchema = Joi.object({
+  name:          Joi.string().min(2).max(100).trim().required(),
+  email:         Joi.string().email().lowercase().trim().required(),
+  role:          Joi.string().valid('ADMIN', 'FIELD_WORKER').required(),
+  department_id: Joi.number().integer().positive().required(),
 });
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -280,6 +288,10 @@ const createDepartment = async (req, res) => {
       `INSERT INTO departments (name) VALUES ($1) RETURNING id, name, created_at`,
       [value.name]
     );
+
+    // Invalidate cache so AI prompt picks up new department immediately
+    invalidateCache();
+
     res.status(201).json({ message: 'Department created.', department: result.rows[0] });
   } catch (err) {
     if (err.code === '23505') {
@@ -304,6 +316,10 @@ const deleteDepartment = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'NOT_FOUND', message: 'Department not found or already deleted.' });
     }
+
+    // Invalidate cache so AI prompt no longer offers this department
+    invalidateCache();
+
     res.status(200).json({ message: `Department "${result.rows[0].name}" deleted.` });
   } catch (err) {
     console.error('[deleteDepartment]', err);
@@ -388,6 +404,244 @@ async function sendRejectionEmail(email, name, shortId, category, reason) {
   });
 }
 
+/**
+ * POST /api/super-admin/staff
+ * Creates a new ADMIN or FIELD_WORKER with a generated password.
+ *
+ * Safety locks:
+ * 1. Duplicate email → 409 (PG unique constraint)
+ * 2. Admin cap per department (configurable: MAX_ADMINS_PER_DEPT)
+ * 3. Department must exist and be active
+ * 4. Email delivery tracking (credentials_sent flag)
+ * 5. Generated password stored NOWHERE in plaintext after creation
+ *    (if email fails, user must use "Forgot Password" to get access)
+ */
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+
+// ╔════════════════════════════════════════════════════════════════════╗
+// ║  CONFIGURABLE: Maximum admins allowed per department.            ║
+// ║  Change this value to allow more admins per dept in the future.  ║
+// ╚════════════════════════════════════════════════════════════════════╝
+const MAX_ADMINS_PER_DEPT = 1;
+
+function generateSecurePassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  const bytes = crypto.randomBytes(16);
+  let password = '';
+  for (let i = 0; i < 16; i++) {
+    password += chars[bytes[i] % chars.length];
+  }
+  return password;
+}
+
+const createStaff = async (req, res) => {
+  try {
+    const { error, value } = createStaffSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ error: 'VALIDATION_ERROR', message: error.details[0].message });
+    }
+
+    const { name, email, role, department_id } = value;
+
+    // ─── Safety Lock 1: Check if email already exists ─────────────────
+    const existingUser = await pool.query('SELECT id, role FROM users WHERE email = $1', [email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({
+        error: 'DUPLICATE',
+        message: `A user with email ${email} already exists (role: ${existingUser.rows[0].role}).`,
+      });
+    }
+
+    // ─── Safety Lock 2: Verify department exists and is active ────────
+    const deptCheck = await pool.query(
+      'SELECT id, name FROM departments WHERE id = $1 AND deleted_at IS NULL',
+      [department_id]
+    );
+    if (deptCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'INVALID_DEPT', message: 'Department not found or has been deleted.' });
+    }
+    const deptName = deptCheck.rows[0].name;
+
+    // ─── Safety Lock 3: Admin cap per department ──────────────────────
+    if (role === 'ADMIN') {
+      const adminCount = await pool.query(
+        "SELECT COUNT(*) FROM users WHERE role = 'ADMIN' AND department_id = $1",
+        [department_id]
+      );
+      if (parseInt(adminCount.rows[0].count) >= MAX_ADMINS_PER_DEPT) {
+        return res.status(400).json({
+          error: 'ADMIN_CAP_REACHED',
+          message: `This department already has ${MAX_ADMINS_PER_DEPT} admin(s). Maximum allowed: ${MAX_ADMINS_PER_DEPT}.`,
+        });
+      }
+    }
+
+    // ─── Generate password & create user ──────────────────────────────
+    const plainPassword = generateSecurePassword();
+    const password_hash = await bcrypt.hash(plainPassword, 12);
+
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password_hash, role, is_verified, department_id)
+       VALUES ($1, $2, $3, $4, TRUE, $5)
+       RETURNING id, name, email, role`,
+      [name, email, password_hash, role, department_id]
+    );
+
+    const newUser = result.rows[0];
+
+    // ─── Send credentials email (track success/failure) ───────────────
+    let emailSent = false;
+    try {
+      await sendCredentialEmail(email, name, role, deptName, plainPassword);
+      emailSent = true;
+      console.log(`[createStaff] ✅ Credentials sent to ${email}`);
+    } catch (emailErr) {
+      console.warn(`[createStaff] ❌ Email FAILED for ${email}: ${emailErr.message}`);
+      // User is created but email failed — they'll need "Forgot Password" or a resend
+    }
+
+    res.status(201).json({
+      message: emailSent
+        ? `${role === 'ADMIN' ? 'Admin' : 'Field Worker'} created. Credentials sent to ${email}.`
+        : `${role === 'ADMIN' ? 'Admin' : 'Field Worker'} created, but email delivery FAILED. Use "Resend Credentials" or the user can reset via Forgot Password.`,
+      user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role, department: deptName },
+      email_sent: emailSent,
+      ...(process.env.NODE_ENV === 'development' && { dev_password: plainPassword }),
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'DUPLICATE', message: 'A user with this email already exists.' });
+    }
+    console.error('[createStaff]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to create staff member.' });
+  }
+};
+
+/**
+ * POST /api/super-admin/staff/:id/resend-credentials
+ * Generates a NEW password for an existing staff user and resends credentials.
+ * Use case: original email failed, or user lost their password and needs admin help.
+ *
+ * Safety: This resets their password (old one is invalidated).
+ */
+const resendCredentials = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch the user
+    const userResult = await pool.query(
+      `SELECT u.id, u.name, u.email, u.role, d.name AS department_name
+       FROM users u
+       LEFT JOIN departments d ON u.department_id = d.id
+       WHERE u.id = $1 AND u.role IN ('ADMIN', 'FIELD_WORKER')`,
+      [id]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: 'Staff user not found.' });
+    }
+
+    const user = userResult.rows[0];
+
+    // Generate new password (invalidates old one)
+    const plainPassword = generateSecurePassword();
+    const password_hash = await bcrypt.hash(plainPassword, 12);
+
+    await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+      [password_hash, id]
+    );
+
+    // Send credentials email
+    let emailSent = false;
+    try {
+      await sendCredentialEmail(user.email, user.name, user.role, user.department_name || '—', plainPassword);
+      emailSent = true;
+    } catch (emailErr) {
+      console.warn(`[resendCredentials] Email failed for ${user.email}: ${emailErr.message}`);
+    }
+
+    res.status(200).json({
+      message: emailSent
+        ? `New credentials sent to ${user.email}. Previous password is now invalid.`
+        : `Password was reset but email delivery FAILED. Dev password shown below (dev only).`,
+      email_sent: emailSent,
+      ...(process.env.NODE_ENV === 'development' && { dev_password: plainPassword }),
+    });
+  } catch (err) {
+    console.error('[resendCredentials]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to resend credentials.' });
+  }
+};
+
+/**
+ * GET /api/super-admin/staff
+ * Lists all ADMIN and FIELD_WORKER users with their department info.
+ */
+const getStaffList = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.email, u.role, u.created_at,
+              d.name AS department_name
+       FROM users u
+       LEFT JOIN departments d ON u.department_id = d.id
+       WHERE u.role IN ('ADMIN', 'FIELD_WORKER')
+       ORDER BY u.role, u.name`
+    );
+    res.status(200).json({ data: result.rows });
+  } catch (err) {
+    console.error('[getStaffList]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch staff.' });
+  }
+};
+
+// ─── Credential Email ────────────────────────────────────────────────────────
+
+async function sendCredentialEmail(email, name, role, deptName, password) {
+  const nodemailer = require('nodemailer');
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: Number(process.env.SMTP_PORT) === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    tls: { rejectUnauthorized: process.env.NODE_ENV === 'production' },
+  });
+
+  const roleLabel = role === 'ADMIN' ? 'Department Admin' : 'Field Worker';
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM || 'noreply@nagarseva.in',
+    to: email,
+    subject: `🏙️ NagarSeva — Your ${roleLabel} Account Credentials`,
+    html: `
+      <div style="font-family:'Inter',sans-serif;max-width:480px;margin:0 auto;background:#0f172a;color:#f1f5f9;padding:40px 32px;border-radius:16px;">
+        <h1 style="color:#38bdf8;font-size:24px;margin:0 0 16px;">🏙️ NagarSeva</h1>
+        <p style="color:#94a3b8;font-size:15px;line-height:1.6;">
+          Hi ${name},<br><br>
+          You've been added as a <strong style="color:#f1f5f9;">${roleLabel}</strong> 
+          in the <strong style="color:#38bdf8;">${deptName}</strong> department.
+        </p>
+        <div style="background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin:20px 0;">
+          <p style="color:#64748b;font-size:12px;text-transform:uppercase;margin:0 0 12px;">Your Login Credentials</p>
+          <p style="color:#f1f5f9;font-size:14px;margin:0 0 8px;">
+            <strong>Email:</strong> ${email}
+          </p>
+          <p style="color:#f1f5f9;font-size:14px;margin:0;">
+            <strong>Password:</strong> <code style="background:#0f172a;padding:2px 8px;border-radius:4px;color:#38bdf8;font-size:15px;">${password}</code>
+          </p>
+        </div>
+        <p style="color:#f59e0b;font-size:13px;line-height:1.5;">
+          ⚠️ Please change your password after your first login using the "Forgot Password" feature.
+        </p>
+        <p style="color:#64748b;font-size:12px;margin-top:16px;">
+          Login at: <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login" style="color:#38bdf8;">NagarSeva Platform</a>
+        </p>
+      </div>
+    `,
+  });
+}
+
 module.exports = {
   getTriagingQueue,
   getIssueDetail,
@@ -397,4 +651,7 @@ module.exports = {
   createDepartment,
   deleteDepartment,
   getStats,
+  createStaff,
+  getStaffList,
+  resendCredentials,
 };

@@ -23,6 +23,9 @@ const {
   login,
   me,
   logout,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
 } = require('../controller/auth');
 
 const router = express.Router();
@@ -40,6 +43,15 @@ router.post('/resend-otp',   otpLimiter,  resendOtp);
 
 /** POST /api/auth/login — authenticate + issue cookie */
 router.post('/login',        authLimiter, login);
+
+/** POST /api/auth/forgot-password — check if registered + send reset OTP */
+router.post('/forgot-password', otpLimiter, forgotPassword);
+
+/** POST /api/auth/verify-reset-otp — verify the reset OTP (step 2) */
+router.post('/verify-reset-otp', authLimiter, verifyResetOtp);
+
+/** POST /api/auth/reset-password — set new password (step 3, requires valid OTP) */
+router.post('/reset-password', authLimiter, resetPassword);
 
 /** POST /api/auth/logout — clear JWT cookie */
 router.post('/logout',       logout);

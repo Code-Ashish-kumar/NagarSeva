@@ -15,6 +15,9 @@ const {
   createDepartment,
   deleteDepartment,
   getStats,
+  createStaff,
+  getStaffList,
+  resendCredentials,
 } = require('../controller/superAdmin');
 
 const router = express.Router();
@@ -41,5 +44,10 @@ router.patch('/issues/:id/reject', rejectIssue);
 router.get('/departments', getDepartments);
 router.post('/departments', createDepartment);
 router.delete('/departments/:id', deleteDepartment);
+
+// Staff management
+router.get('/staff', getStaffList);
+router.post('/staff', createStaff);
+router.post('/staff/:id/resend-credentials', resendCredentials);
 
 module.exports = router;

@@ -9,6 +9,7 @@ import RoleRedirect from "./components/common/RoleRedirect";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
+import ForgotPassword from "./pages/ForgotPassword";
 import CitizenDashboard from "./pages/CitizenDashboard";
 import FieldWorkerDashboard from "./pages/FieldWorkerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -16,6 +17,7 @@ import ReportWizard from "./pages/ReportWizard";
 import MyComplaints from "./pages/MyComplaints";
 import CityPulse from "./pages/CityPulse";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import Landing from "./pages/Landing";
 
 
 export default function App() {
@@ -41,6 +43,7 @@ export default function App() {
       <Route path="/login"        element={<Login />} />
       <Route path="/register"     element={<Register />} />
       <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
 
       {/* Role-based protected dashboards */}
       <Route

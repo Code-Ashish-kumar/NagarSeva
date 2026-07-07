@@ -1,15 +1,17 @@
 import { Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
+import Landing from "../../pages/Landing";
 
 /**
- * Redirects the authenticated user to their role-specific dashboard.
- * Used as the default "/" route target.
+ * At "/":
+ * - Not authenticated → show Landing page
+ * - Authenticated → redirect to role-specific dashboard
  */
 export default function RoleRedirect() {
   const { user, loading, isAuthenticated } = useSelector((state) => state.auth);
 
   if (loading) return null;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Landing />;
 
   switch (user?.role) {
     case "SUPER_ADMIN":
