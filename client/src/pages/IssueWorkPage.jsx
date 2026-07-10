@@ -19,6 +19,8 @@ import 'leaflet/dist/leaflet.css';
 import { apiConnector } from '../services/apiConnector';
 import { endpoints } from '../services/api';
 import '../styles/fieldworker.css';
+import FieldWorker_Navbar from '../components/core/fieldworker/FieldWorker_Navbar';
+import { FiCheckCircle } from 'react-icons/fi';
 
 // Fix Leaflet default marker icons (Vite asset pipeline strips the URLs)
 delete L.Icon.Default.prototype._getIconUrl;
@@ -92,60 +94,50 @@ function haversineMetres(lat1, lng1, lat2, lng2) {
 
 // ─── Embedded Site Map ───────────────────────────────────────────────────────────
 
-/**
- * Compact Leaflet map pinned at the issue location.
- * Scroll-wheel zoom disabled to avoid hijacking page scroll.
- */
 function SiteMap({ lat, lng, shortId, address }) {
   if (!lat || !lng) return null;
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
   return (
-    <div className="fw-work-section">
-      <p className="fw-work-label">🗺️ Work Site Map</p>
-      <div className="fw-map-shell">
-        <MapContainer
-          center={[lat, lng]}
-          zoom={16}
-          scrollWheelZoom={false}
-          zoomControl={true}
-          style={{ height: '220px', width: '100%', borderRadius: '10px 10px 0 0' }}
-          className="fw-map-container"
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Marker position={[lat, lng]} icon={SITE_ICON}>
-            <Popup>
-              <strong>{shortId}</strong><br />
-              {address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`}
-            </Popup>
-          </Marker>
-        </MapContainer>
-        <a
-          href={mapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fw-map-nav-link"
-        >
-          🧭 Navigate to site (Google Maps)
-        </a>
-      </div>
+    <div className="border border-gray-200 rounded-sm overflow-hidden mt-4">
+      <MapContainer
+        center={[lat, lng]}
+        zoom={16}
+        scrollWheelZoom={false}
+        zoomControl={true}
+        style={{ height: '220px', width: '100%' }}
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <Marker position={[lat, lng]} icon={SITE_ICON}>
+          <Popup>
+            <strong>{shortId}</strong><br />
+            {address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`}
+          </Popup>
+        </Marker>
+      </MapContainer>
+      <a
+        href={mapsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 p-3 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-extrabold border-t border-sky-150 transition cursor-pointer text-center select-none"
+      >
+        🧭 Navigate to site (Google Maps)
+      </a>
     </div>
   );
 }
 
-// ─── Status Badge ─────────────────────────────────────────────────────────────
-
 function StatusBadge({ status }) {
   const map = {
-    ASSIGNED: { cls: 'fw-status-assigned', label: '⏳ Assigned' },
-    IN_PROGRESS: { cls: 'fw-status-in_progress', label: '🔧 In Progress' },
-    RESOLVED: { cls: 'fw-status-resolved', label: '✅ Resolved' },
+    ASSIGNED: { cls: 'bg-amber-50 text-amber-600 border-amber-100', label: '⏳ Assigned' },
+    IN_PROGRESS: { cls: 'bg-blue-50 text-blue-600 border-blue-100', label: '🔧 In Progress' },
+    RESOLVED: { cls: 'bg-green-50 text-green-600 border-green-100', label: '✅ Resolved' },
   };
-  const s = map[status] || { cls: '', label: status };
-  return <span className={`fw-status ${s.cls}`}>{s.label}</span>;
+  const s = map[status] || { cls: 'bg-gray-50 text-gray-650 border-gray-150', label: status };
+  return <span className={`text-[10px] font-extrabold uppercase px-2.5 py-1 rounded border inline-block leading-none ${s.cls}`}>{s.label}</span>;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -155,6 +147,13 @@ export default function IssueWorkPage() {
   const navigate = useNavigate();
 
   const [data, setData] = useState(null);
+  
+  // Persistent sidebar collapse state
+  const [isCollapsed, setIsCollapsed] = useState(() => localStorage.getItem('fieldworker-sidebar-collapsed') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('fieldworker-sidebar-collapsed', isCollapsed);
+  }, [isCollapsed]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [localStatus, setLocalStatus] = useState(null);
@@ -432,9 +431,12 @@ export default function IssueWorkPage() {
 
   if (loading) {
     return (
-      <div className="fw-work-page">
-        <div className="fw-loading">
-          <span className="spinner" style={{ width: 22, height: 22 }} /> Loading issue…
+      <div className="flex min-h-screen bg-[#f3f5f9] text-gray-800 font-sans">
+        <FieldWorker_Navbar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+        <div className={`flex-1 flex flex-col min-w-0 pr-6 py-8 transition-all duration-300 ${isCollapsed ? 'md:pl-[118px]' : 'md:pl-[294px]'}`}>
+          <div className="fw-loading">
+            <span className="spinner" style={{ width: 22, height: 22 }} /> Loading issue…
+          </div>
         </div>
       </div>
     );
@@ -450,277 +452,330 @@ export default function IssueWorkPage() {
   const resolutionImages = images.filter((img) => img.image_type === 'RESOLUTION');
 
   return (
-    <div className="fw-work-page">
-      {/* ── Header ── */}
-      <div className="fw-work-header">
-        <button className="fw-back-btn" onClick={() => navigate('/field-worker')}>
-          ← Back
-        </button>
-        <span className="fw-work-short-id">{issue.short_id}</span>
-        <StatusBadge status={status} />
-        {starting && (
-          <span style={{ fontSize: '0.72rem', color: 'var(--color-muted)' }}>
-            Starting…
-          </span>
-        )}
-      </div>
+    <div className="flex min-h-screen bg-[#f3f5f9] text-gray-800 font-sans">
+      {/* Sidebar Navigation */}
+      <FieldWorker_Navbar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
 
-      <div className="fw-work-body">
-
-        {/* ── Title ── */}
-        <div style={{ marginBottom: 20 }}>
-          <p className="fw-work-short-id" style={{ marginBottom: 4 }}>
-            {CATEGORY_LABELS[issue.category] || issue.category}
-          </p>
-          <h1 className="fw-work-category">
-            {issue.assigned_admin_designation
-              ? `Routed to: ${issue.assigned_admin_designation}`
-              : issue.short_id}
-          </h1>
-        </div>
-
-        {/* ── Meta chips ── */}
-        <div className="fw-work-meta">
-          <div className="fw-meta-chip">
-            👥 <strong>{watcher_count}</strong>&nbsp;following
+      {/* Main Content Area */}
+      <div className={`flex-1 flex flex-col min-w-0 pr-6 py-8 transition-all duration-300 ${isCollapsed ? 'md:pl-[118px]' : 'md:pl-[294px]'}`}>
+        
+        {/* Breadcrumb Header Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4 border-gray-200 mb-6">
+          <div>
+            <button 
+              onClick={() => navigate('/field-worker')}
+              className="px-4.5 py-2.5 bg-white hover:bg-gray-50 text-gray-800 text-xs font-extrabold rounded-sm transition duration-150 flex items-center gap-1.5 border border-gray-200/80 shadow-xs cursor-pointer"
+            >
+              ← Back to Dashboard
+            </button>
           </div>
-          <div className="fw-meta-chip">
-            ⬆ <strong>{issue.priority_score}</strong>&nbsp;priority
-          </div>
-          <div className="fw-meta-chip">
-            📅 {new Date(issue.created_at).toLocaleDateString('en-IN')}
-          </div>
-        </div>
-
-        {/* ── Address ── */}
-        {issue.address && (
-          <div className="fw-work-section">
-            <p className="fw-work-label">📍 Location</p>
-            <p className="fw-work-text fw-work-address">{issue.address}</p>
-          </div>
-        )}
-
-        {/* ── Embedded map ── */}
-        <SiteMap
-          lat={issue.lat}
-          lng={issue.lng}
-          shortId={issue.short_id}
-          address={issue.address}
-        />
-
-        {/* ── Description ── */}
-        {issue.description && (
-          <div className="fw-work-section">
-            <p className="fw-work-label">📋 Description</p>
-            <p className="fw-work-text">{issue.description}</p>
-          </div>
-        )}
-
-        {/* ── Report images (citizen evidence) ── */}
-        {reportImages.length > 0 && (
-          <div className="fw-work-section">
-            <p className="fw-work-label">📸 Reported by Citizens ({reportImages.length})</p>
-            <div className="fw-img-grid">
-              {reportImages.map((img) => (
-                <div key={img.id}>
-                  <img
-                    className="fw-img-thumb"
-                    src={img.image_url}
-                    alt="Report evidence"
-                    onClick={() => window.open(img.image_url, '_blank')}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <p className="fw-img-tag report">Evidence</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Resolution images (already uploaded) ── */}
-        {resolutionImages.length > 0 && (
-          <div className="fw-work-section">
-            <p className="fw-work-label">✅ Resolution Photos ({resolutionImages.length})</p>
-            <div className="fw-img-grid">
-              {resolutionImages.map((img) => (
-                <div key={img.id}>
-                  <img
-                    className="fw-img-thumb"
-                    src={img.image_url}
-                    alt="Resolution"
-                    onClick={() => window.open(img.image_url, '_blank')}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  <p className="fw-img-tag resolution">Resolved</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <hr className="fw-divider" />
-
-        {/* ── Resolved state ── */}
-        {isResolved ? (
-          <div className="fw-resolved-banner">
-            ✅ This issue has been marked as Resolved.
-            {issue.resolved_at && (
-              <p style={{ fontSize: '0.75rem', marginTop: 4, opacity: 0.7 }}>
-                {new Date(issue.resolved_at).toLocaleString('en-IN')}
-              </p>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400 bg-gray-100 px-2 py-1 rounded border border-gray-200/50">
+              #{issue.short_id}
+            </span>
+            <StatusBadge status={status} />
+            {starting && (
+              <span className="text-[10px] text-amber-600 font-extrabold bg-amber-50 border border-amber-100 px-2 py-1 rounded-sm animate-pulse">
+                Starting Work...
+              </span>
             )}
           </div>
-        ) : (
-          <>
-            {/* ── Proximity-gated camera capture ── */}
-            <div className="fw-work-section">
-              <p className="fw-work-label">📷 Capture Site Photos (camera only · max 5)</p>
+        </div>
 
-              {/* State: idle — show verify button */}
-              {geoStatus === 'idle' && (
-                <button className="fw-geo-btn" onClick={verifyAndOpenCamera}>
-                  📍 Verify Location &amp; Open Camera
-                </button>
-              )}
+        {/* Dashboard grid layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Left Column (2/3 width) */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Details Card */}
+            <div className="bg-white p-6 rounded-sm border border-gray-200 shadow-xs space-y-5">
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Complaint Category</span>
+                <h2 className="text-lg font-black text-gray-905 leading-tight">
+                  {CATEGORY_LABELS[issue.category] || issue.category}
+                </h2>
+              </div>
 
-              {/* State: checking */}
-              {geoStatus === 'checking' && (
-                <div className="fw-geo-info checking">
-                  <span className="spinner" style={{ width: 16, height: 16 }} />
-                  Checking your location…
+              {issue.description && (
+                <div>
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">📋 Description</h4>
+                  <p className="text-xs text-gray-700 font-semibold bg-gray-50 p-3.5 rounded-sm leading-relaxed whitespace-pre-wrap shadow-sm">
+                    {issue.description}
+                  </p>
                 </div>
               )}
 
-              {/* State: too far */}
-              {geoStatus === 'far' && (
-                <div className="fw-geo-info far">
-                  <p>📍 You are <strong>{distanceM} m</strong> from the work site.</p>
-                  {fetchedCoords && (
-                    <p style={{ fontSize: '0.72rem', opacity: 0.8, marginBottom: 8, lineHeight: 1.3 }}>
-                      Detected: {fetchedCoords.lat.toFixed(5)}, {fetchedCoords.lng.toFixed(5)} (±{fetchedCoords.accuracy}m accuracy)
-                    </p>
-                  )}
-                  <p>You must be within <strong>{PROXIMITY_RADIUS} m</strong> to capture photos.</p>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-                    <button className="fw-geo-retry" onClick={() => setGeoStatus('idle')}>Try Again</button>
-                    <button
-                      className="fw-geo-override"
-                      onClick={async () => {
-                        setGeoStatus('nearby');
-                        await openCamera();
-                      }}
-                      style={{
-                        background: 'rgba(251, 191, 36, 0.12)',
-                        border: '1px solid rgba(251, 191, 36, 0.35)',
-                        color: '#fbbf24',
-                        padding: '6px 12px',
-                        borderRadius: 'var(--radius-sm)',
-                        cursor: 'pointer',
-                        fontSize: '0.78rem',
-                        fontWeight: 600
-                      }}
+              {issue.address && (
+                <div>
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">📍 Location Address</h4>
+                  <p className="text-xs text-gray-700 font-bold bg-gray-50 p-3.5 rounded-sm shadow-sm">
+                    {issue.address}
+                  </p>
+                </div>
+              )}
+
+              <SiteMap lat={issue.lat} lng={issue.lng} shortId={issue.short_id} address={issue.address} />
+            </div>
+
+            {/* Evidence Attachments Card */}
+            {reportImages.length > 0 && (
+              <div className="bg-white p-6 rounded-sm border border-gray-200 shadow-xs space-y-4">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  📸 Citizen Evidence Attachments
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {reportImages.map((img) => (
+                    <a 
+                      key={img.id} 
+                      href={img.image_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="block border border-gray-200/80 rounded-sm overflow-hidden hover:border-blue-400 transition"
                     >
-                      ⚠️ Override (GPS Drift)
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* State: denied */}
-              {geoStatus === 'denied' && (
-                <div className="fw-geo-info far">
-                  <p>🚫 Location permission denied.</p>
-                  <p>Enable location access in your browser settings, then try again.</p>
-                  <button className="fw-geo-retry" onClick={() => setGeoStatus('idle')}>Retry</button>
-                </div>
-              )}
-
-              {/* State: generic error */}
-              {geoStatus === 'error' && (
-                <div className="fw-geo-info far">
-                  <p>⚠️ Could not access location or camera.</p>
-                  <button className="fw-geo-retry" onClick={() => setGeoStatus('idle')}>Retry</button>
-                </div>
-              )}
-
-              {/* State: nearby — live camera viewfinder */}
-              {cameraOn && (
-                <div className="fw-camera-shell">
-                  <div className="fw-camera-badge">📍 {distanceM} m from site · Camera active</div>
-                  <video
-                    ref={videoRef}
-                    className="fw-camera-video"
-                    autoPlay
-                    playsInline
-                    muted
-                  />
-                  {/* Hidden canvas for frame capture */}
-                  <canvas ref={canvasRef} style={{ display: 'none' }} />
-                  <div className="fw-camera-controls">
-                    <button
-                      className="fw-shutter-btn"
-                      onClick={captureFrame}
-                      disabled={previewFiles.length >= 5}
-                      title="Capture photo"
-                    >
-                      📸
-                    </button>
-                    <span className="fw-shutter-count">{previewFiles.length}/5</span>
-                    <button className="fw-camera-close" onClick={closeCamera}>✕ Close</button>
-                  </div>
-                </div>
-              )}
-
-              {/* Captured previews */}
-              {previewFiles.length > 0 && (
-                <div className="fw-preview-grid" style={{ marginTop: 12 }}>
-                  {previewFiles.map((p, i) => (
-                    <div key={i} className="fw-preview-item">
-                      <img className="fw-preview-img" src={p.objectUrl} alt={`Capture ${i + 1}`} />
-                      <button className="fw-preview-remove" onClick={() => removePreview(i)} title="Remove">×</button>
-                    </div>
+                      <img src={img.image_url} className="w-full h-24 sm:h-28 object-cover" alt="" />
+                    </a>
                   ))}
                 </div>
-              )}
-            </div>
-
-            {/* ── Note ── */}
-            <div className="fw-work-section">
-              <p className="fw-work-label">📝 Completion Note (optional)</p>
-              <textarea
-                className="fw-note-area"
-                placeholder="Describe what was done, materials used, observations…"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                maxLength={500}
-              />
-            </div>
-
-            {/* ── Error ── */}
-            {resolveError && (
-              <p style={{ color: '#ef4444', fontSize: '0.82rem', marginBottom: 12 }}>
-                ⚠️ {resolveError}
-              </p>
+              </div>
             )}
 
-            {/* ── Resolve button ── */}
-            <button
-              className="fw-resolve-btn"
-              onClick={handleResolve}
-              disabled={uploading || status !== 'IN_PROGRESS'}
-            >
-              {uploading
-                ? `⏳ ${previewFiles.length > 0 ? 'Uploading photos…' : 'Saving…'}`
-                : '✅ Mark as Resolved'}
-            </button>
+            {/* Verification & Proximity Photo Capturing Card */}
+            {isResolved ? (
+              <div className="bg-white p-6 rounded-sm border border-green-200 shadow-xs border-l-4 border-l-green-500 space-y-4">
+                <div className="flex items-center gap-2 text-green-700 font-extrabold text-sm">
+                  <FiCheckCircle className="w-5 h-5" />
+                  <span>Task Marked as Completed</span>
+                </div>
+                {resolutionImages.length > 0 && (
+                  <div>
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Resolution Photos</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {resolutionImages.map((img) => (
+                        <a 
+                          key={img.id} 
+                          href={img.image_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="block border border-gray-200 rounded-sm overflow-hidden hover:border-green-400 transition"
+                        >
+                          <img src={img.image_url} className="w-full h-24 sm:h-28 object-cover" alt="" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {issue.resolution_note && (
+                  <div>
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Resolution Note</h4>
+                    <p className="text-xs font-semibold text-gray-700 bg-gray-50 border border-gray-150 p-3 rounded-sm italic whitespace-pre-wrap">
+                      "{issue.resolution_note}"
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white p-6 rounded-sm border border-gray-200 shadow-xs space-y-4">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  📸 Capture Site Resolution Photos (max 5)
+                </h3>
 
-            {status === 'ASSIGNED' && !starting && (
-              <p style={{ fontSize: '0.72rem', color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>
-                Issue must be In Progress before resolving. Starting…
-              </p>
+                {/* GPS State: idle */}
+                {geoStatus === 'idle' && (
+                  <button 
+                    onClick={verifyAndOpenCamera}
+                    className="w-full py-3 bg-[#1e2a5a] hover:bg-[#2d3f82] text-white text-xs font-extrabold rounded-sm shadow-sm transition cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>📍 Verify Location &amp; Open Camera</span>
+                  </button>
+                )}
+
+                {/* GPS State: checking */}
+                {geoStatus === 'checking' && (
+                  <div className="flex items-center justify-center gap-2 py-4 bg-gray-50 border border-gray-200 rounded-sm text-xs font-bold text-gray-500">
+                    <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+                    <span>Verifying GPS Proximity coordinates...</span>
+                  </div>
+                )}
+
+                {/* GPS State: too far */}
+                {geoStatus === 'far' && (
+                  <div className="p-4 bg-red-50 border border-red-200/50 rounded-sm space-y-3">
+                    <p className="text-xs font-bold text-red-700">
+                      📍 Proximity Restriction: You are {distanceM?.toFixed(1)} metres away from the work site.
+                    </p>
+                    {fetchedCoords && (
+                      <p className="text-[10px] text-red-550 font-medium">
+                        Detected GPS position: {fetchedCoords.lat.toFixed(5)}, {fetchedCoords.lng.toFixed(5)} (±{fetchedCoords.accuracy.toFixed(1)}m precision)
+                      </p>
+                    )}
+                    <p className="text-[11px] text-gray-650 font-semibold leading-relaxed">
+                      Ranchi Municipal policy dictates you must be within {PROXIMITY_RADIUS} metres of the reported coordinates to capture resolution evidence photos.
+                    </p>
+                    <div className="flex gap-2 pt-1.5">
+                      <button 
+                        onClick={() => setGeoStatus('idle')}
+                        className="px-3.5 py-1.5 bg-red-100 hover:bg-red-200/70 text-red-700 text-[10px] font-extrabold rounded-sm transition cursor-pointer"
+                      >
+                        Try Again
+                      </button>
+                      <button 
+                        onClick={async () => { setGeoStatus('nearby'); await openCamera(); }}
+                        className="px-3.5 py-1.5 bg-amber-100 hover:bg-amber-200/70 text-amber-700 text-[10px] font-extrabold rounded-sm transition cursor-pointer"
+                      >
+                        ⚠️ Override Proximity Check (GPS Drift)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* GPS State: denied */}
+                {geoStatus === 'denied' && (
+                  <div className="p-4 bg-amber-50 border border-amber-200/50 rounded-sm space-y-2">
+                    <p className="text-xs font-bold text-amber-700">🚫 Location Permission Denied</p>
+                    <p className="text-[11px] text-gray-600 font-semibold">
+                      Please grant location services permission in your web browser settings to verify proximity to the work site coordinates.
+                    </p>
+                    <button onClick={() => setGeoStatus('idle')} className="px-3.5 py-1.5 bg-amber-100 hover:bg-amber-200/70 text-amber-700 text-[10px] font-extrabold rounded-sm transition cursor-pointer mt-1">
+                      Retry Verification
+                    </button>
+                  </div>
+                )}
+
+                {/* GPS State: error */}
+                {geoStatus === 'error' && (
+                  <div className="p-4 bg-red-50 border border-red-200/50 rounded-sm space-y-2">
+                    <p className="text-xs font-bold text-red-700">⚠️ Location or Camera Access Error</p>
+                    <button onClick={() => setGeoStatus('idle')} className="px-3.5 py-1.5 bg-red-100 hover:bg-red-200/70 text-red-700 text-[10px] font-extrabold rounded-sm transition cursor-pointer mt-1">
+                      Retry
+                    </button>
+                  </div>
+                )}
+
+                {/* Camera Viewfinder Stream */}
+                {cameraOn && (
+                  <div className="border border-gray-200 rounded-sm overflow-hidden shadow-inner bg-black relative">
+                    <div className="absolute top-2.5 left-2.5 z-10 bg-black/60 backdrop-blur-xs text-green-400 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded border border-green-400/35">
+                      📷 Live view &bull; Proximity Verified
+                    </div>
+                    <video ref={videoRef} className="w-full max-h-[300px] object-cover bg-black block" autoPlay playsInline muted />
+                    <canvas ref={canvasRef} className="hidden" />
+                    
+                    <div className="flex items-center justify-between p-3 bg-gray-900 border-t border-gray-800">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{previewFiles.length}/5 Captured</span>
+                      <button 
+                        onClick={captureFrame}
+                        disabled={previewFiles.length >= 5}
+                        className="w-12 h-12 rounded-full bg-white hover:bg-gray-150 border-4 border-gray-300 disabled:opacity-40 disabled:hover:bg-white text-xl flex items-center justify-center cursor-pointer shadow-md transform hover:scale-105 active:scale-95 transition"
+                      >
+                        📸
+                      </button>
+                      <button 
+                        onClick={closeCamera}
+                        className="px-3 py-1.5 bg-red-650 hover:bg-red-700 text-white text-[10px] font-extrabold rounded-sm transition cursor-pointer"
+                      >
+                        ✕ Close
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Image Previews */}
+                {previewFiles.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5 pt-2">
+                    {previewFiles.map((p, idx) => (
+                      <div key={idx} className="relative aspect-square border border-gray-200 rounded-sm overflow-hidden group">
+                        <img src={p.objectUrl} className="w-full h-full object-cover" alt="" />
+                        <button 
+                          onClick={() => removePreview(idx)}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-650 hover:bg-red-750 text-white text-xs flex items-center justify-center cursor-pointer transition shadow-md"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
-          </>
-        )}
+          </div>
+
+          {/* Right Column (1/3 width) */}
+          <div className="lg:col-span-1 space-y-6">
+            
+            {/* Details Panel */}
+            <div className="bg-white p-5 rounded-sm border border-gray-200 shadow-xs space-y-4">
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block leading-none">Routed Department</span>
+                <span className="font-extrabold text-sm text-[#1e2a5a] block mt-1.5">
+                  🏢 {issue.assigned_admin_designation || 'General Wing'}
+                </span>
+              </div>
+
+              <div className="pt-3.5 border-t border-gray-100 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
+                  <span>Priority Score:</span>
+                  <span className="font-extrabold text-red-600 bg-red-50 border border-red-100 px-2 py-0.5 rounded-full text-[11px]">
+                    {issue.priority_score}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
+                  <span>Watchers:</span>
+                  <span className="font-extrabold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full text-[11px]">
+                    {watcher_count} following
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs font-semibold text-gray-500">
+                  <span>Report Date:</span>
+                  <span className="font-bold text-gray-700 text-[11px]">
+                    {new Date(issue.created_at).toLocaleDateString('en-IN')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Note & Resolve Button */}
+            {!isResolved && (
+              <div className="bg-white p-5 rounded-sm border border-gray-200 shadow-xs space-y-4">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">📝 Resolution Notes</label>
+                  <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    disabled={status !== 'IN_PROGRESS'}
+                    placeholder="Enter details about the resolution work done..."
+                    className="w-full bg-gray-50 border border-gray-200 text-xs font-semibold p-2.5 rounded-sm focus:outline-none placeholder-gray-400 focus:bg-white resize-none h-28"
+                    maxLength={500}
+                  />
+                </div>
+
+                {resolveError && (
+                  <p className="text-xs text-red-650 font-bold bg-red-50 border border-red-100 p-2.5 rounded-sm">
+                    ⚠️ {resolveError}
+                  </p>
+                )}
+
+                <button
+                  onClick={handleResolve}
+                  disabled={uploading || status !== 'IN_PROGRESS'}
+                  className="w-full py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white text-xs font-extrabold rounded-sm shadow-sm transition cursor-pointer"
+                >
+                  {uploading 
+                    ? `⏳ ${previewFiles.length > 0 ? 'Uploading Photos...' : 'Saving...'}`
+                    : '✅ Mark as Resolved'}
+                </button>
+
+                {status === 'ASSIGNED' && !starting && (
+                  <p className="text-[10px] text-amber-600 font-bold text-center bg-amber-50 border border-amber-100 p-2.5 rounded-sm">
+                    Starting task automatically... Please wait.
+                  </p>
+                )}
+              </div>
+            )}
+
+          </div>
+
+        </div>
       </div>
     </div>
   );

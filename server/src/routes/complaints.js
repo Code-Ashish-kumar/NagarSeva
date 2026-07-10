@@ -14,7 +14,7 @@ router.use(auth);
 
 /**
  * POST /api/complaints/analyze
- * Analyse a complaint image with AI (Groq/Llama 4 Scout) and return structured data.
+ * Analyse a complaint image with AI (Groq/Qwen 3.6 27B) and return structured data.
  */
 router.post('/analyze', analyze);
 

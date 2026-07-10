@@ -1,15 +1,13 @@
 /**
  * src/config/ai.js
  *
- * AI-powered civic complaint analysis using Groq (Llama 4 Scout).
+ * AI-powered civic complaint analysis using Groq (Qwen 3.6 27B).
  * Uses the OpenAI-compatible Groq API for fast multimodal inference.
  *
- * Model: meta-llama/llama-4-scout-17b-16e-instruct
+ * Model: qwen/qwen3.6-27b
  *   - Natively multimodal (image + text)
- *   - 128K context window
  *   - Supports JSON mode
- *   - Up to 5 images per request
- *   - 460+ tokens/sec on Groq hardware
+ *   - Dual-mode reasoning capabilities (reasoning field returned separately by Groq)
  *
  * Retry strategy: Exponential backoff with full jitter on 429/503 errors.
  */
@@ -18,7 +16,7 @@ const { getDepartmentNames } = require('./departmentCache');
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const MODEL = 'qwen/qwen3.6-27b';
 
 // Retry configuration
 const MAX_RETRIES   = 4;

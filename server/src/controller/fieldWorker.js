@@ -72,7 +72,7 @@ const getResolvedIssues = async (req, res) => {
          ORDER BY uploaded_at LIMIT 1) AS thumbnail
       FROM issues i
       WHERE i.assigned_to = $1
-        AND i.status = 'RESOLVED'
+        AND i.status IN ('RESOLVED', 'NOT_SATISFIED')
       ORDER BY i.resolved_at DESC NULLS LAST, i.updated_at DESC`,
       [worker_id]
     );

@@ -4,7 +4,7 @@
 
 NagarSeva is a smart civic issue reporting platform for Indian cities. Citizens report infrastructure problems (potholes, garbage, broken lights) with photos and GPS location. AI validates the reports, the system deduplicates nearby complaints, and a role-based hierarchy (SuperAdmin → Admin → Field Worker) routes and resolves them.
 
-**Tech Stack:** React 18 + Vite + Redux Toolkit + Leaflet + Supercluster | Express.js + PostgreSQL + PostGIS + Cloudinary + Groq (Llama 4 Scout)
+**Tech Stack:** React 18 + Vite + Redux Toolkit + Leaflet + Supercluster | Express.js + PostgreSQL + PostGIS + Cloudinary + Groq (Qwen 3.6 27B)
 
 ---
 
@@ -15,7 +15,7 @@ NagarSeva is a smart civic issue reporting platform for Indian cities. Citizens 
 | File | Purpose | Interview Point |
 |------|---------|-----------------|
 | `server/src/config/db.js` | PostgreSQL connection pool (max 10, idle timeout 30s) | "Connection pooling prevents opening a new TCP socket on every query. The pool reuses connections, keeping latency under 1ms for warm queries." |
-| `server/src/config/ai.js` | Groq SDK wrapper for Llama 4 Scout multimodal analysis. Exponential backoff with full jitter on 429/503. | "I use full jitter (`random(0, cap)`) instead of equal jitter to prevent thundering herd when multiple retried requests would otherwise all fire at the same backoff interval." |
+| `server/src/config/ai.js` | Groq SDK wrapper for Qwen 3.6 27B multimodal analysis. Exponential backoff with full jitter on 429/503. | "I use full jitter (`random(0, cap)`) instead of equal jitter to prevent thundering herd when multiple retried requests would otherwise all fire at the same backoff interval." |
 | `server/src/config/cloudinary.js` | Cloudinary v2 config (reads env vars at startup) | "Client uploads directly to Cloudinary using a signed upload. The server generates a time-limited HMAC signature — images never transit through Express, saving bandwidth." |
 | `server/src/config/dedup.js` | Reads `DEDUP_RADIUS_METRES` (default 50) and `DEDUP_PRIORITY_BOOST` (default 1.0) from env | "Configuration is externalized so different city deployments can tune dedup aggressiveness without code changes." |
 | `server/src/config/mailer.js` | Nodemailer transport (Gmail/Mailtrap). Verifies connection at startup. | "SMTP verification on boot gives immediate feedback if credentials are wrong, rather than failing silently on the first OTP send." |

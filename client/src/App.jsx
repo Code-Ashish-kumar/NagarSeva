@@ -11,13 +11,13 @@ import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
 import ForgotPassword from "./pages/ForgotPassword";
 import CitizenDashboard from "./pages/CitizenDashboard";
-import FieldWorkerDashboard from "./pages/FieldWorkerDashboard";
+import FieldWorker_Home from "./pages/FieldWorker_Home";
+import FieldWorker_Reports from "./pages/FieldWorker_Reports";
 import IssueWorkPage from "./pages/IssueWorkPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import ReportWizard from "./pages/ReportWizard";
 import MyComplaints from "./pages/MyComplaints";
 import CityPulse from "./pages/CityPulse";
-import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import Landing from "./pages/Landing";
 import Admin_Home from "./pages/Admin_Home";
 import Admin_Reports from "./pages/Admin_Reports";
@@ -89,7 +89,15 @@ export default function App() {
         path="/field-worker"
         element={
           <ProtectedRoute roles={["FIELD_WORKER"]}>
-            <FieldWorkerDashboard />
+            <FieldWorker_Home />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/field-worker/reports"
+        element={
+          <ProtectedRoute roles={["FIELD_WORKER"]}>
+            <FieldWorker_Reports />
           </ProtectedRoute>
         }
       />

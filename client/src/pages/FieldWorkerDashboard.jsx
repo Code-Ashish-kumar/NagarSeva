@@ -29,21 +29,21 @@ const CATEGORY_LABELS = {
 
 function StatusBadge({ status }) {
   const map = {
-    ASSIGNED:    { cls: 'fw-status-assigned',    label: '⏳ Assigned' },
+    ASSIGNED: { cls: 'fw-status-assigned', label: '⏳ Assigned' },
     IN_PROGRESS: { cls: 'fw-status-in_progress', label: '🔧 In Progress' },
-    RESOLVED:    { cls: 'fw-status-resolved',    label: '✅ Resolved' },
+    RESOLVED: { cls: 'fw-status-resolved', label: '✅ Resolved' },
   };
   const s = map[status] || { cls: '', label: status };
   return <span className={`fw-status ${s.cls}`}>{s.label}</span>;
 }
 
 export default function FieldWorkerDashboard() {
-  const { user }   = useSelector((s) => s.auth);
-  const dispatch   = useDispatch();
-  const navigate   = useNavigate();
+  const { user } = useSelector((s) => s.auth);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-  const [tab, setTab]         = useState('active');   // 'active' | 'resolved'
-  const [active, setActive]   = useState([]);
+  const [tab, setTab] = useState('active');   // 'active' | 'resolved'
+  const [active, setActive] = useState([]);
   const [resolved, setResolved] = useState([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);       // DB profile with designation + dept
@@ -52,7 +52,7 @@ export default function FieldWorkerDashboard() {
   useEffect(() => {
     apiConnector('GET', endpoints.ME_API)
       .then((res) => setProfile(res.user))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   const fetchIssues = useCallback(async () => {
@@ -62,7 +62,7 @@ export default function FieldWorkerDashboard() {
         apiConnector('GET', endpoints.FW_ACTIVE_API),
         apiConnector('GET', endpoints.FW_RESOLVED_API),
       ]);
-      setActive(activeRes.data   || []);
+      setActive(activeRes.data || []);
       setResolved(resolvedRes.data || []);
     } catch (err) {
       console.error('[FW] fetch error:', err);
@@ -80,13 +80,13 @@ export default function FieldWorkerDashboard() {
   }, [fetchIssues]);
 
   function handleLogout() {
-    apiConnector('POST', endpoints.LOGOUT_API).catch(() => {});
+    apiConnector('POST', endpoints.LOGOUT_API).catch(() => { });
     dispatch(clearAuth());
     navigate('/login', { replace: true });
   }
 
   const inProgress = active.filter((i) => i.status === 'IN_PROGRESS').length;
-  const assigned   = active.filter((i) => i.status === 'ASSIGNED').length;
+  const assigned = active.filter((i) => i.status === 'ASSIGNED').length;
 
   const issues = tab === 'active' ? active : resolved;
 
