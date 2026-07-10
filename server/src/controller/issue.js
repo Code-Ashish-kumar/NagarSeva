@@ -19,7 +19,7 @@ const createIssueSchema = Joi.object({
 const updateStatusSchema = Joi.object({
   new_status: Joi.string().valid(
     'SUBMITTED', 'VERIFIED', 'REJECTED', 'ASSIGNED',
-    'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REOPENED'
+    'IN_PROGRESS', 'RESOLVED', 'NOT_SATISFIED'
   ).required(),
   note: Joi.string().max(500).allow('', null),
 });
@@ -87,7 +87,7 @@ const createIssue = async (req, res) => {
       `SELECT id, short_id, report_count, priority_score
        FROM issues
        WHERE category = $1
-         AND status IN ('SUBMITTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'REOPENED')
+         AND status IN ('SUBMITTED', 'VERIFIED', 'ASSIGNED', 'IN_PROGRESS', 'NOT_SATISFIED')
          AND reporter_id != $2
          AND ST_DWithin(location, ST_SetSRID(ST_MakePoint($3, $4), 4326), $5)
          AND id NOT IN (SELECT issue_id FROM watchers WHERE user_id = $2)
@@ -278,7 +278,7 @@ const getNearbyIssues = async (req, res) => {
           ST_SetSRID(ST_MakePoint($1, $2), 4326), 
           $3
        )
-       AND i.status NOT IN ('CLOSED', 'REJECTED')
+       AND i.status NOT IN ('RESOLVED', 'REJECTED')
     `;
     
     // The base array of values mapped to $1, $2, $3
@@ -448,7 +448,7 @@ const meToo = async (req, res) => {
   const issue = issueCheck.rows[0];
 
   // 2. Check if issue is closed/rejected/resolved
-  if (['CLOSED', 'REJECTED', 'RESOLVED'].includes(issue.status)) {
+  if (['REJECTED', 'RESOLVED', 'NOT_SATISFIED'].includes(issue.status)) {
     return res.status(400).json({ error: 'ISSUE_CLOSED', message: 'This issue is no longer accepting endorsements.' });
   }
 
@@ -575,7 +575,7 @@ const getViewportIssues = async (req, res) => {
         ) AS thumbnail
       FROM issues i
       WHERE i.location::geometry && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-        AND i.status NOT IN ('CLOSED', 'REJECTED')
+        AND i.status NOT IN ('RESOLVED', 'REJECTED')
       ORDER BY i.priority_score DESC
       LIMIT 500`,
       [sw_lng, sw_lat, ne_lng, ne_lat]

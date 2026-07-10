@@ -11,6 +11,8 @@ const {
   getRankedWorkers,
   assignWorker,
   getDeptStats,
+  getIssueDetailForAdmin,
+  getWorkerIssues
 } = require('../controller/admin');
 
 const router = express.Router();
@@ -26,6 +28,12 @@ router.get('/queue', getDepartmentQueue);
 
 // Ranked field workers in this department
 router.get('/workers', getRankedWorkers);
+
+// Issues assigned to a specific field worker
+router.get('/workers/:workerId/issues', getWorkerIssues);
+
+// Full details of a departmental issue
+router.get('/issues/:id/detail', getIssueDetailForAdmin);
 
 // Assign a specific worker to an issue
 router.patch('/issues/:id/assign', assignWorker);

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS issues (
     status        VARCHAR(20) NOT NULL DEFAULT 'SUBMITTED'
                   CHECK (status IN (
                     'SUBMITTED', 'VERIFIED', 'REJECTED', 'ASSIGNED',
-                    'IN_PROGRESS', 'RESOLVED', 'CLOSED', 'REOPENED'
+                    'IN_PROGRESS', 'RESOLVED', 'NOT_SATISFIED'
                   )),
     priority_score DECIMAL(5,2) DEFAULT 0,
     report_count  INTEGER DEFAULT 1,  -- incremented on duplicate merge

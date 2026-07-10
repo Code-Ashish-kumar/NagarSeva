@@ -19,6 +19,12 @@ import MyComplaints from "./pages/MyComplaints";
 import CityPulse from "./pages/CityPulse";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 import Landing from "./pages/Landing";
+import Admin_Home from "./pages/Admin_Home";
+import Admin_Reports from "./pages/Admin_Reports";
+import Admin_FieldWorkers from "./pages/Admin_FieldWorkers";
+import SuperAdmin_Home from "./pages/SuperAdmin_Home";
+import SuperAdmin_Reports from "./pages/SuperAdmin_Reports";
+import SuperAdmin_Departments from "./pages/SuperAdmin_Departments";
 
 
 export default function App() {
@@ -96,7 +102,7 @@ export default function App() {
         }
       />
       <Route
-        path="/admin"
+        path="/admin/dashboard"
         element={
           <ProtectedRoute roles={["ADMIN"]}>
             <AdminDashboard />
@@ -104,13 +110,54 @@ export default function App() {
         }
       />
       <Route
-        path="/super-admin"
+        path="/admin"
         element={
-          <ProtectedRoute roles={["SUPER_ADMIN"]}>
-            <SuperAdminDashboard />
+          <ProtectedRoute roles={["ADMIN"]}>
+            <Admin_Home />
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin/reports"
+        element={
+          <ProtectedRoute roles={["ADMIN"]}>
+            <Admin_Reports />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/field_workers"
+        element={
+          <ProtectedRoute roles={["ADMIN"]}>
+            <Admin_FieldWorkers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin"
+        element={
+          <ProtectedRoute roles={["SUPER_ADMIN"]}>
+            <SuperAdmin_Home />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin/reports"
+        element={
+          <ProtectedRoute roles={["SUPER_ADMIN"]}>
+            <SuperAdmin_Reports />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin/departments"
+        element={
+          <ProtectedRoute roles={["SUPER_ADMIN"]}>
+            <SuperAdmin_Departments />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/super-admin" element={<Navigate to="/superadmin" replace />} />
 
       {/* Default: redirect to correct dashboard based on role */}
       <Route path="/"  element={<RoleRedirect />} />

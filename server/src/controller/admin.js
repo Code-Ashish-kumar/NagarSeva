@@ -20,7 +20,7 @@ const assignSchema = Joi.object({
 
 const W_EXPERIENCE = parseFloat(process.env.WORKER_W_EXPERIENCE) || 0.3;
 const W_SUCCESS    = parseFloat(process.env.WORKER_W_SUCCESS)    || 0.4;
-const W_BUSYNESS   = parseFloat(process.env.WORKER_W_BUSYNESS)  || 0.3;
+const W_BUSYNESS   = parseFloat(process.env.WORKER_W_BUSYNESS)  || 0.5;
 
 /**
  * Helper: Get the admin's department_id and designation from JWT (fast)
@@ -58,6 +58,8 @@ const getDepartmentQueue = async (req, res) => {
       return res.status(400).json({ error: 'NO_DEPARTMENT', message: 'You are not assigned to a department.' });
     }
 
+    const statusParam = req.query.status || 'ASSIGNED';
+
     const result = await pool.query(
       `SELECT 
         i.id, i.short_id, i.category, i.description, i.status,
@@ -69,16 +71,19 @@ const getDepartmentQueue = async (req, res) => {
         EXTRACT(DAY FROM NOW() - i.updated_at)::INT AS days_pending
       FROM issues i
       WHERE i.department_id = $1
-        AND i.status = 'ASSIGNED'
+        AND i.status = $2
         AND (
           i.assigned_admin_designation IS NULL
-          OR i.assigned_admin_designation = $2
+          OR i.assigned_admin_designation = $3
         )
       ORDER BY i.priority_score DESC, i.created_at ASC`,
-      [dept_id, adminDesignation]
+      [dept_id, statusParam, adminDesignation]
     );
 
-    res.status(200).json({ count: result.rows.length, data: result.rows });
+    res.status(200).json({ 
+      count: result.rows.length, 
+      data: result.rows 
+    });
   } catch (err) {
     console.error('[getDepartmentQueue]', err);
     res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch department queue.' });
@@ -107,8 +112,8 @@ const getRankedWorkers = async (req, res) => {
       `WITH worker_stats AS (
         SELECT
           u.id, u.name, u.email, u.designation,
-          COUNT(i.id) FILTER (WHERE i.status IN ('RESOLVED', 'CLOSED')) AS resolved_count,
-          COUNT(i.id) FILTER (WHERE i.status = 'REJECTED') AS rejected_count,
+          COUNT(i.id) FILTER (WHERE i.status = 'RESOLVED') AS resolved_count,
+          COUNT(i.id) FILTER (WHERE i.status = 'NOT_SATISFIED') AS rejected_count,
           COUNT(i.id) FILTER (WHERE i.status = 'IN_PROGRESS') AS active_count,
           COUNT(i.id) AS total_handled
         FROM users u
@@ -234,7 +239,6 @@ const getDeptStats = async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'ASSIGNED') AS pending_assignment,
         COUNT(*) FILTER (WHERE status = 'IN_PROGRESS') AS in_progress,
         COUNT(*) FILTER (WHERE status = 'RESOLVED') AS resolved,
-        COUNT(*) FILTER (WHERE status = 'CLOSED') AS closed,
         (SELECT COUNT(*) FROM users WHERE department_id = $1 AND role = 'FIELD_WORKER') AS worker_count
       FROM issues
       WHERE department_id = $1
@@ -253,4 +257,89 @@ const getDeptStats = async (req, res) => {
   }
 };
 
-module.exports = { getDepartmentQueue, getRankedWorkers, assignWorker, getDeptStats };
+const getIssueDetailForAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const dept_id = await getAdminDeptId(req);
+    if (!dept_id) {
+      return res.status(400).json({ error: 'NO_DEPARTMENT', message: 'No department assigned.' });
+    }
+
+    const issueResult = await pool.query(
+      `SELECT i.*, 
+              ST_Y(i.location::geometry) AS lat,
+              ST_X(i.location::geometry) AS lng,
+              u.name AS reporter_name,
+              u.email AS reporter_email,
+              w.name AS worker_name,
+              w.email AS worker_email
+       FROM issues i 
+       LEFT JOIN users u ON i.reporter_id = u.id
+       LEFT JOIN users w ON i.assigned_to = w.id
+       WHERE i.id = $1 AND i.department_id = $2`,
+      [id, dept_id]
+    );
+
+    if (issueResult.rows.length === 0) {
+      return res.status(404).json({ error: 'NOT_FOUND', message: 'Issue not found or does not belong to your department.' });
+    }
+
+    const imagesResult = await pool.query(
+      `SELECT id, image_url, image_type, uploaded_at 
+       FROM issue_images 
+       WHERE issue_id = $1 
+       ORDER BY uploaded_at`,
+      [id]
+    );
+
+    res.status(200).json({
+      issue: issueResult.rows[0],
+      images: imagesResult.rows,
+    });
+  } catch (err) {
+    console.error('[getIssueDetailForAdmin]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch issue details.' });
+  }
+};
+
+/**
+ * GET /api/admin/workers/:workerId/issues
+ * Returns all issues assigned to a specific field worker.
+ */
+const getWorkerIssues = async (req, res) => {
+  try {
+    const { workerId } = req.params;
+    const dept_id = await getAdminDeptId(req);
+    if (!dept_id) {
+      return res.status(400).json({ error: 'NO_DEPARTMENT', message: 'You are not assigned to a department.' });
+    }
+
+    const result = await pool.query(
+      `SELECT 
+        i.id, i.short_id, i.category, i.description, i.status,
+        i.address, i.priority_score, i.report_count, i.created_at, i.updated_at,
+        ST_Y(i.location::geometry) AS lat,
+        ST_X(i.location::geometry) AS lng,
+        (SELECT image_url FROM issue_images WHERE issue_id = i.id AND image_type = 'REPORT' ORDER BY uploaded_at LIMIT 1) AS thumbnail,
+        EXTRACT(DAY FROM NOW() - i.updated_at)::INT AS days_pending
+      FROM issues i
+      WHERE i.assigned_to = $1 AND i.department_id = $2
+      ORDER BY i.created_at DESC`,
+      [workerId, dept_id]
+    );
+
+    res.status(200).json({ data: result.rows });
+  } catch (err) {
+    console.error('[getWorkerIssues]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch issues for worker.' });
+  }
+};
+
+module.exports = { 
+  getDepartmentQueue, 
+  getRankedWorkers, 
+  assignWorker, 
+  getDeptStats, 
+  getIssueDetailForAdmin,
+  getWorkerIssues
+};

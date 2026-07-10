@@ -15,7 +15,7 @@ export default function RoleRedirect() {
 
   switch (user?.role) {
     case "SUPER_ADMIN":
-      return <Navigate to="/super-admin" replace />;
+      return <Navigate to="/superadmin" replace />;
     case "ADMIN":
       return <Navigate to="/admin" replace />;
     case "FIELD_WORKER":

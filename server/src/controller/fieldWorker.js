@@ -57,7 +57,7 @@ const getActiveIssues = async (req, res) => {
 
 /**
  * GET /api/field-worker/issues/resolved
- * Returns RESOLVED + CLOSED issues assigned to the requesting field worker.
+ * Returns RESOLVED issues assigned to the requesting field worker.
  */
 const getResolvedIssues = async (req, res) => {
   try {
@@ -72,7 +72,7 @@ const getResolvedIssues = async (req, res) => {
          ORDER BY uploaded_at LIMIT 1) AS thumbnail
       FROM issues i
       WHERE i.assigned_to = $1
-        AND i.status IN ('RESOLVED', 'CLOSED')
+        AND i.status = 'RESOLVED'
       ORDER BY i.resolved_at DESC NULLS LAST, i.updated_at DESC`,
       [worker_id]
     );

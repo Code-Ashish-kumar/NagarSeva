@@ -96,13 +96,33 @@
   }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: var(--color-base); }
-  ::-webkit-scrollbar-thumb {
-    background: var(--color-elevated);
-    border-radius: var(--radius-full);
+  *, html, body {
+    --sb-track-color: #eae8e8;
+    --sb-thumb-color: #1e2a5a;
+    --sb-size: 10px;
   }
-  ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+  ::-webkit-scrollbar {
+    width: var(--sb-size);
+    height: var(--sb-size);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--sb-track-color);
+    border-radius: 2px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--sb-thumb-color);
+    border-radius: 2px;
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    *, html, body {
+        scrollbar-color: var(--sb-thumb-color)
+                       var(--sb-track-color);
+    }
+  }
 }
 
 /* ── Reusable component classes ─────────────────────────────────────────────

@@ -36,8 +36,7 @@ const STATUS_STYLES = {
   ASSIGNED:    { bg: 'rgba(168,85,247,0.12)',  color: '#a855f7',  label: 'Assigned' },
   IN_PROGRESS: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b',  label: 'In Progress' },
   RESOLVED:    { bg: 'rgba(34,197,94,0.12)',   color: '#22c55e',  label: 'Resolved' },
-  CLOSED:      { bg: 'rgba(100,116,139,0.12)', color: '#64748b', label: 'Closed' },
-  REOPENED:    { bg: 'rgba(249,115,22,0.12)',  color: '#f97316',  label: 'Reopened' },
+  NOT_SATISFIED: { bg: 'rgba(239,68,68,0.12)',  color: '#ef4444',  label: 'Not Satisfied' },
 };
 
 function StatusBadge({ status }) {

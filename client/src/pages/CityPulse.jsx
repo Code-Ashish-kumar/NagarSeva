@@ -37,7 +37,7 @@ const CATEGORY_ICONS = {
 
 const STATUS_COLORS = {
   SUBMITTED: '#38bdf8', VERIFIED: '#22c55e', ASSIGNED: '#a855f7',
-  IN_PROGRESS: '#f59e0b', RESOLVED: '#22c55e', REOPENED: '#f97316',
+  IN_PROGRESS: '#f59e0b', RESOLVED: '#22c55e', NOT_SATISFIED: '#ef4444',
 };
 
 /** Creates a custom cluster icon */

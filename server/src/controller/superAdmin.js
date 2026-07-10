@@ -56,16 +56,20 @@ const createStaffSchema = Joi.object({
  */
 const getTriagingQueue = async (req, res) => {
   try {
+    const statusParam = req.query.status || 'SUBMITTED';
     const result = await pool.query(
       `SELECT 
         i.id, i.short_id, i.category, i.description, i.status,
         i.address, i.priority_score, i.report_count, i.created_at,
         ST_Y(i.location::geometry) AS lat,
         ST_X(i.location::geometry) AS lng,
-        (SELECT image_url FROM issue_images WHERE issue_id = i.id AND image_type = 'REPORT' ORDER BY uploaded_at LIMIT 1) AS thumbnail
+        (SELECT image_url FROM issue_images WHERE issue_id = i.id AND image_type = 'REPORT' ORDER BY uploaded_at LIMIT 1) AS thumbnail,
+        d.name AS department_name
       FROM issues i
-      WHERE i.status = 'SUBMITTED'
-      ORDER BY i.priority_score DESC, i.created_at ASC`
+      LEFT JOIN departments d ON i.department_id = d.id
+      WHERE i.status = $1
+      ORDER BY i.priority_score DESC, i.created_at ASC`,
+      [statusParam]
     );
 
     res.status(200).json({ count: result.rows.length, data: result.rows });
@@ -83,15 +87,16 @@ const getIssueDetail = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Issue + reporter info
     const issueResult = await pool.query(
       `SELECT 
         i.*, 
         ST_Y(i.location::geometry) AS lat,
         ST_X(i.location::geometry) AS lng,
-        u.name AS reporter_name, u.email AS reporter_email
+        u.name AS reporter_name, u.email AS reporter_email,
+        d.name AS department_name
       FROM issues i
       LEFT JOIN users u ON i.reporter_id = u.id
+      LEFT JOIN departments d ON i.department_id = d.id
       WHERE i.id = $1`,
       [id]
     );
@@ -297,7 +302,7 @@ const getDepartments = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT d.id, d.name, d.dept_type, d.created_at,
-        (SELECT COUNT(*) FROM issues WHERE department_id = d.id AND status NOT IN ('CLOSED', 'REJECTED')) AS active_issues,
+        (SELECT COUNT(*) FROM issues WHERE department_id = d.id AND status NOT IN ('RESOLVED', 'REJECTED')) AS active_issues,
         (SELECT COUNT(*) FROM users WHERE department_id = d.id AND role = 'FIELD_WORKER') AS worker_count,
         (SELECT COUNT(*) FROM users WHERE department_id = d.id AND role = 'ADMIN') AS admin_count
       FROM departments d
@@ -376,7 +381,7 @@ const getStats = async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'IN_PROGRESS') AS in_progress_count,
         COUNT(*) FILTER (WHERE status = 'RESOLVED') AS resolved_count,
         COUNT(*) FILTER (WHERE status = 'REJECTED') AS rejected_count,
-        COUNT(*) FILTER (WHERE status NOT IN ('CLOSED', 'REJECTED')) AS total_active
+        COUNT(*) FILTER (WHERE status NOT IN ('RESOLVED', 'REJECTED')) AS total_active
       FROM issues
     `);
 
@@ -703,8 +708,8 @@ const resendCredentials = async (req, res) => {
 const getStaffList = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT u.id, u.name, u.email, u.role, u.created_at,
-              d.name AS department_name
+      `SELECT u.id, u.name, u.email, u.role, u.designation, u.created_at,
+              u.department_id, d.name AS department_name
        FROM users u
        LEFT JOIN departments d ON u.department_id = d.id
        WHERE u.role IN ('ADMIN', 'FIELD_WORKER')

@@ -143,7 +143,6 @@ function StatusBadge({ status }) {
     ASSIGNED: { cls: 'fw-status-assigned', label: '⏳ Assigned' },
     IN_PROGRESS: { cls: 'fw-status-in_progress', label: '🔧 In Progress' },
     RESOLVED: { cls: 'fw-status-resolved', label: '✅ Resolved' },
-    CLOSED: { cls: 'fw-status-closed', label: '🔒 Closed' },
   };
   const s = map[status] || { cls: '', label: status };
   return <span className={`fw-status ${s.cls}`}>{s.label}</span>;
@@ -445,7 +444,7 @@ export default function IssueWorkPage() {
 
   const { issue, images, watcher_count } = data;
   const status = localStatus || issue.status;
-  const isResolved = ['RESOLVED', 'CLOSED'].includes(status);
+  const isResolved = status === 'RESOLVED';
 
   const reportImages = images.filter((img) => img.image_type === 'REPORT');
   const resolutionImages = images.filter((img) => img.image_type === 'RESOLUTION');

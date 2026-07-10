@@ -34,7 +34,9 @@ export const endpoints = {
   ADMIN_STATS_API:         BASE_URL + "/admin/stats",
   ADMIN_QUEUE_API:         BASE_URL + "/admin/queue",
   ADMIN_WORKERS_API:       BASE_URL + "/admin/workers",
+  ADMIN_WORKER_ISSUES_API: (workerId) => BASE_URL + "/admin/workers/" + workerId + "/issues",
   ADMIN_ASSIGN_API:        (id) => BASE_URL + "/admin/issues/" + id + "/assign",
+  ADMIN_ISSUE_DETAIL_API:  (id) => BASE_URL + "/admin/issues/" + id + "/detail",
   // FIELD WORKER ENDPOINTS
   FW_ACTIVE_API:           BASE_URL + "/field-worker/issues",
   FW_RESOLVED_API:         BASE_URL + "/field-worker/issues/resolved",
