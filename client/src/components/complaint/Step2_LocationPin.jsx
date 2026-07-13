@@ -8,6 +8,7 @@
  *  4. Reverse-geocode via Nominatim for a suggested address.
  *  5. Editable address field for user to refine/enter manually.
  *  6. "Next" is disabled until a pin has been placed.
+ *  7. Redesigned to pure Tailwind CSS.
  */
 import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -15,6 +16,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { setLocation } from '../../slices/complaintSlice';
+import { FiLoader, FiCheckCircle, FiAlertTriangle, FiMapPin, FiCompass } from 'react-icons/fi';
 
 // Fix Leaflet's default icon paths broken by Vite bundling
 delete L.Icon.Default.prototype._getIconUrl;
@@ -24,11 +26,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
-const DEFAULT_CENTER = { lat: 20.5937, lng: 78.9629 }; // centre of India
+const DEFAULT_CENTER = { lat: 20.5937, lng: 78.9629 };
 const DEFAULT_ZOOM   = 5;
 const LOCATED_ZOOM   = 16;
 
-/** Inner component — uses map events hook (must be inside MapContainer) */
 function PinDropHandler({ onPinDrop }) {
   useMapEvents({
     click(e) {
@@ -38,7 +39,6 @@ function PinDropHandler({ onPinDrop }) {
   return null;
 }
 
-/** Flies the map to a new center+zoom when props change */
 function FlyToLocation({ center, zoom }) {
   const map = useMapEvents({});
   useEffect(() => {
@@ -49,7 +49,6 @@ function FlyToLocation({ center, zoom }) {
   return null;
 }
 
-/** Reverse-geocode via Nominatim (free, no API key needed) */
 async function reverseGeocode(lat, lng) {
   try {
     const res = await fetch(
@@ -74,10 +73,9 @@ export default function Step2_LocationPin({ onNext, onBack }) {
   const [autoAddress, setAutoAddress] = useState(saved?.address ?? null);
   const [userAddress, setUserAddress] = useState(saved?.userAddress ?? '');
   const [geocoding,   setGeocoding]   = useState(false);
-  const [flyTarget,   setFlyTarget]   = useState(null);   // { lat, lng } to fly to
+  const [flyTarget,   setFlyTarget]   = useState(null);
   const mapRef = useRef(null);
 
-  // Request geolocation on mount
   useEffect(() => {
     if (!navigator.geolocation) {
       setGeoStatus('denied');
@@ -88,7 +86,7 @@ export default function Step2_LocationPin({ onNext, onBack }) {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setCenter(loc);
         setZoom(LOCATED_ZOOM);
-        setFlyTarget(loc);  // triggers map fly animation
+        setFlyTarget(loc);
         setGeoStatus('granted');
         handlePinDrop(loc);
       },
@@ -106,11 +104,9 @@ export default function Step2_LocationPin({ onNext, onBack }) {
     const addr = await reverseGeocode(loc.lat, loc.lng);
     setAutoAddress(addr);
     setGeocoding(false);
-    // Only auto-fill userAddress if it's empty (don't overwrite manual edits)
     if (!userAddress.trim()) {
       setUserAddress(addr || '');
     }
-    // Dispatch with whatever address is currently in the input
     const finalAddress = userAddress.trim() || addr || '';
     dispatch(setLocation({ ...loc, address: finalAddress, userAddress: finalAddress }));
   }
@@ -118,7 +114,6 @@ export default function Step2_LocationPin({ onNext, onBack }) {
   function handleAddressChange(e) {
     const val = e.target.value;
     setUserAddress(val);
-    // Update Redux with the user-typed address
     if (pin) {
       dispatch(setLocation({ lat: pin.lat, lng: pin.lng, address: val, userAddress: val }));
     }
@@ -135,7 +130,6 @@ export default function Step2_LocationPin({ onNext, onBack }) {
 
   function handleNext() {
     if (pin) {
-      // Final sync of address to Redux before advancing
       const finalAddr = userAddress.trim() || autoAddress || '';
       dispatch(setLocation({ lat: pin.lat, lng: pin.lng, address: finalAddr, userAddress: userAddress }));
       onNext();
@@ -144,22 +138,38 @@ export default function Step2_LocationPin({ onNext, onBack }) {
 
   return (
     <div>
-      <h2 className="step-title">Pin the Location</h2>
-      <p className="step-subtitle">
-        {geoStatus === 'denied'
-          ? 'Location access was denied. Navigate the map and click to drop a pin.'
-          : "We've centred the map on your position. Click anywhere to refine the pin."}
-      </p>
-
-      {/* Geolocation status */}
-      <div className="location-status">
-        {geoStatus === 'pending' && <><span className="spinner" style={{ borderTopColor: 'var(--color-accent)' }} />Locating…</>}
-        {geoStatus === 'granted' && <><span style={{ color: 'var(--color-success)' }}>●</span> Location access granted</>}
-        {geoStatus === 'denied'  && <><span style={{ color: 'var(--color-warning)' }}>●</span> Location access denied — manual pin required</>}
+      {/* Heading row */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">Pin the Location</h2>
+          <p className="text-[11px] text-gray-400 font-semibold mt-0.5">
+            {geoStatus === 'denied'
+              ? 'Location denied. Navigate the map and click to drop a pin.'
+              : "Map centred on your position. Click anywhere to refine."}
+          </p>
+        </div>
+        {/* GPS status pill */}
+        <div className="shrink-0">
+          {geoStatus === 'pending' && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-[9px] font-bold uppercase tracking-wide">
+              <FiLoader className="w-3 h-3 animate-spin" /> Locating
+            </span>
+          )}
+          {geoStatus === 'granted' && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold uppercase tracking-wide">
+              <FiCheckCircle className="w-3 h-3" /> GPS Active
+            </span>
+          )}
+          {geoStatus === 'denied' && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-bold uppercase tracking-wide">
+              <FiAlertTriangle className="w-3 h-3" /> GPS Off
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Leaflet Map */}
-      <div className="map-container">
+      <div className="w-full h-64 border border-gray-200 rounded-sm overflow-hidden mt-4 shadow-sm relative z-0">
         <MapContainer
           center={[center.lat, center.lng]}
           zoom={zoom}
@@ -187,55 +197,59 @@ export default function Step2_LocationPin({ onNext, onBack }) {
         </MapContainer>
       </div>
 
-      {/* Detected address pill */}
+      {/* Detected address row */}
       {pin && (
-        <div className={`location-pill pinned`}>
-          <span>📍</span>
-          <span>
-            {geocoding ? 'Detecting address…' : (autoAddress ?? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`)}
-          </span>
-        </div>
-      )}
+        <div className="mt-4 border border-gray-200 rounded-sm">
+          {/* Auto-detected row */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide w-20 shrink-0">Detected</span>
+            <span className="text-[11px] font-semibold text-gray-700 flex-1">
+              {geocoding ? (
+                <span className="flex items-center gap-1.5 text-gray-400">
+                  <FiLoader className="w-3 h-3 animate-spin" /> Detecting address…
+                </span>
+              ) : (autoAddress ?? `${pin.lat.toFixed(5)}, ${pin.lng.toFixed(5)}`)}
+            </span>
+            <FiCompass className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          </div>
 
-      {/* User-editable address field */}
-      {pin && (
-        <div className="address-input-wrap">
-          <label htmlFor="address-input" className="address-input-label">
-            Confirm or edit issue area address
-          </label>
-          <div className="address-input-row">
+          {/* Editable address row */}
+          <div className="flex items-center gap-3 px-4 py-2.5">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide w-20 shrink-0">Address</span>
             <input
               id="address-input"
               type="text"
-              className="address-input"
-              placeholder="e.g. Near SBI Bank, MG Road, Sector 5, Lucknow"
+              className="flex-1 text-[11px] font-semibold text-gray-800 bg-transparent border-none outline-none placeholder-gray-400 py-1"
+              placeholder="e.g. Near SBI Bank, MG Road, Ranchi"
               value={userAddress}
               onChange={handleAddressChange}
               maxLength={300}
             />
+            {userAddress && <FiCheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
           </div>
-          {autoAddress && userAddress !== autoAddress && (
-            <button
-              type="button"
-              className="address-use-detected"
-              onClick={handleUseDetected}
-            >
-              ↩ Use detected: <span>{autoAddress.length > 60 ? autoAddress.slice(0, 60) + '…' : autoAddress}</span>
-            </button>
-          )}
-          <p className="address-hint">
-            💡 A clear landmark or street name helps resolve your issue faster
-          </p>
         </div>
       )}
+      {pin && autoAddress && userAddress !== autoAddress && (
+        <button
+          type="button"
+          className="text-[10px] font-bold text-[#1e2a5a] hover:underline mt-1.5 cursor-pointer block"
+          onClick={handleUseDetected}
+        >
+          ↩ Use detected address
+        </button>
+      )}
 
-      <div className="wizard-nav">
-        <button id="complaint-step2-back" className="btn-back" onClick={onBack}>
+      <div className="flex justify-between pt-5 mt-4 border-t border-gray-100">
+        <button
+          id="complaint-step2-back"
+          className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-sm border border-gray-200 transition cursor-pointer"
+          onClick={onBack}
+        >
           ← Back
         </button>
         <button
           id="complaint-step2-next"
-          className="btn-next"
+          className="px-6 py-2.5 bg-[#1e2a5a] hover:bg-[#2d3f82] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-sm transition cursor-pointer"
           onClick={handleNext}
           disabled={!pin}
         >

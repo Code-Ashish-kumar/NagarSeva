@@ -249,10 +249,9 @@ const updateIssueStatus = async (req, res) => {
 /**
  * GET /api/issues/nearby
  * Fetches nearby issues using PostGIS spatial querying.
- * BUG FIX: Removed the duplicated inner function definition. The original code
- *          had an entire second copy of this function pasted inside the outer
- *          function body, making `category` and `result` unreachable in the
- *          outer scope — causing a ReferenceError at runtime.
+ * When an authenticated user calls this endpoint, each issue includes:
+ *   - is_watching  {boolean} — true if the user is in the watchers table for this issue
+ *   - is_reporter  {boolean} — true if the user is the original reporter
  */
 const getNearbyIssues = async (req, res) => {
   try {
@@ -262,45 +261,57 @@ const getNearbyIssues = async (req, res) => {
     }
 
     const { lat, lng, radius, category } = value;
+    const userId = req.user?.id ?? null;   // null when unauthenticated
 
     // Build the base query and parameters
     let queryStr = `
-      SELECT 
-          i.id, i.short_id, i.category, i.description, i.status, i.priority_score,
+      SELECT
+          i.id, i.short_id, i.category, i.description, i.status,
+          i.priority_score, i.address, i.report_count, i.created_at,
+          i.reporter_id,
+          u.name AS reporter_name,
           ST_AsGeoJSON(i.location)::json AS geo_location,
-          (
-              SELECT image_url FROM issue_images 
-              WHERE issue_id = i.id AND image_type = 'REPORT' LIMIT 1
-          ) as thumbnail
+          COALESCE(
+            (
+              SELECT json_agg(image_url)
+              FROM issue_images
+              WHERE issue_id = i.id AND image_type = 'REPORT'
+            ),
+            '[]'::json
+          ) AS image_urls,
+          ${userId
+            ? `EXISTS (SELECT 1 FROM watchers WHERE issue_id = i.id AND user_id = $4) AS is_watching,
+               (i.reporter_id = $4) AS is_reporter`
+            : `FALSE AS is_watching,
+               FALSE AS is_reporter`
+          }
        FROM issues i
+       LEFT JOIN users u ON i.reporter_id = u.id
        WHERE ST_DWithin(
-          i.location, 
-          ST_SetSRID(ST_MakePoint($1, $2), 4326), 
+          i.location,
+          ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
           $3
        )
        AND i.status NOT IN ('RESOLVED', 'REJECTED')
     `;
-    
-    // The base array of values mapped to $1, $2, $3
-    const queryParams = [lng, lat, radius];
 
-    // Dynamically append the category filter if provided
+    const queryParams = [lng, lat, radius];
+    if (userId) queryParams.push(userId);   // $4
+
     if (category) {
-      queryParams.push(category); // This makes it $4
-      queryStr += ` AND i.category = $${queryParams.length}`; 
+      queryParams.push(category);
+      queryStr += ` AND i.category = $${queryParams.length}`;
     }
 
-    // Finally, append the ORDER BY clause
-    queryStr += ` ORDER BY i.priority_score DESC;`;
+    queryStr += ` ORDER BY ST_Distance(i.location, ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) ASC;`;
 
     const result = await pool.query(queryStr, queryParams);
 
     res.status(200).json({
       message: 'Nearby issues retrieved.',
       count: result.rows.length,
-      data: result.rows
+      data: result.rows,
     });
-
   } catch (err) {
     console.error('[getNearbyIssues]', err);
     res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch nearby issues.' });
@@ -398,7 +409,15 @@ const getMyIssues = async (req, res) => {
           SELECT image_url FROM issue_images 
           WHERE issue_id = i.id AND image_type = 'REPORT' 
           ORDER BY uploaded_at LIMIT 1
-        ) as thumbnail
+        ) as thumbnail,
+        COALESCE(
+          (
+            SELECT json_agg(image_url) 
+            FROM issue_images 
+            WHERE issue_id = i.id AND image_type = 'REPORT'
+          ),
+          '[]'::json
+        ) AS image_urls
       FROM issues i
       INNER JOIN watchers w ON w.issue_id = i.id
       WHERE w.user_id = $1
@@ -417,6 +436,50 @@ const getMyIssues = async (req, res) => {
 };
 
 /**
+ * GET /api/issues/upvoted
+ * Returns issues the authenticated user has upvoted (watching but did NOT report).
+ * Excludes issues where the user is the original reporter — those are in "My Complaints".
+ */
+const getUpvotedIssues = async (req, res) => {
+  try {
+    const user_id = req.user.id;
+
+    const result = await pool.query(
+      `SELECT
+        i.id, i.short_id, i.category, i.description, i.status,
+        i.address, i.priority_score, i.report_count, i.created_at, i.updated_at,
+        (
+          SELECT image_url FROM issue_images
+          WHERE issue_id = i.id AND image_type = 'REPORT'
+          ORDER BY uploaded_at LIMIT 1
+        ) AS thumbnail,
+        COALESCE(
+          (
+            SELECT json_agg(image_url)
+            FROM issue_images
+            WHERE issue_id = i.id AND image_type = 'REPORT'
+          ),
+          '[]'::json
+        ) AS image_urls
+      FROM issues i
+      INNER JOIN watchers w ON w.issue_id = i.id
+      WHERE w.user_id = $1
+        AND i.reporter_id != $1
+      ORDER BY i.updated_at DESC`,
+      [user_id]
+    );
+
+    res.status(200).json({
+      count: result.rows.length,
+      data: result.rows,
+    });
+  } catch (err) {
+    console.error('[getUpvotedIssues]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch upvoted issues.' });
+  }
+};
+
+/**
  * POST /api/issues/:id/me-too
  * Allows a citizen to endorse an existing issue ("Me too"), boosting its priority.
  *
@@ -425,7 +488,7 @@ const getMyIssues = async (req, res) => {
  *   - Otherwise, user must provide GPS coords (X-User-Lat, X-User-Lng headers)
  *     and be within 500m of the issue to endorse it.
  */
-const ENDORSE_RADIUS_METRES = 500;
+const ENDORSE_RADIUS_METRES = 20000;
 
 const meToo = async (req, res) => {
   const issue_id = req.params.id;
@@ -544,6 +607,9 @@ const meToo = async (req, res) => {
 /**
  * GET /api/issues/viewport
  * Returns issues within the map's visible bounding box.
+ * When an authenticated user calls this endpoint, each issue includes:
+ *   - is_watching  {boolean} — true if the user is in the watchers table for this issue
+ *   - is_reporter  {boolean} — true if the user is the original reporter
  * Uses the && operator with ST_MakeEnvelope for pure GIST index scan.
  */
 const viewportSchema = Joi.object({
@@ -561,24 +627,31 @@ const getViewportIssues = async (req, res) => {
     }
 
     const { sw_lng, sw_lat, ne_lng, ne_lat } = value;
+    const userId = req.user?.id ?? null;
 
     const result = await pool.query(
-      `SELECT 
+      `SELECT
         i.id, i.short_id, i.category, i.status, i.report_count,
-        i.priority_score, i.address, i.description,
+        i.priority_score, i.address, i.description, i.reporter_id,
         ST_X(i.location::geometry) AS lng,
         ST_Y(i.location::geometry) AS lat,
         (
-          SELECT image_url FROM issue_images 
+          SELECT image_url FROM issue_images
           WHERE issue_id = i.id AND image_type = 'REPORT'
           ORDER BY uploaded_at LIMIT 1
-        ) AS thumbnail
+        ) AS thumbnail,
+        ${userId
+          ? `EXISTS (SELECT 1 FROM watchers WHERE issue_id = i.id AND user_id = $5) AS is_watching,
+             (i.reporter_id = $5) AS is_reporter`
+          : `FALSE AS is_watching,
+             FALSE AS is_reporter`
+        }
       FROM issues i
       WHERE i.location::geometry && ST_MakeEnvelope($1, $2, $3, $4, 4326)
         AND i.status NOT IN ('RESOLVED', 'REJECTED')
       ORDER BY i.priority_score DESC
       LIMIT 500`,
-      [sw_lng, sw_lat, ne_lng, ne_lat]
+      userId ? [sw_lng, sw_lat, ne_lng, ne_lat, userId] : [sw_lng, sw_lat, ne_lng, ne_lat]
     );
 
     res.status(200).json({
@@ -591,4 +664,36 @@ const getViewportIssues = async (req, res) => {
   }
 };
 
-module.exports = { createIssue, updateIssueStatus, getNearbyIssues, getMyIssues, getViewportIssues, watchIssue, unwatchIssue, meToo };
+/**
+ * GET /api/issues/:id/audit-logs
+ * Retrieves the status trail history for an issue.
+ */
+const getIssueAuditLogs = async (req, res) => {
+  try {
+    const issue_id = req.params.id;
+
+    // Verify issue exists first
+    const issueCheck = await pool.query('SELECT id FROM issues WHERE id = $1', [issue_id]);
+    if (issueCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'ISSUE_NOT_FOUND', message: 'Issue not found.' });
+    }
+
+    const audit = await pool.query(
+      `SELECT a.id, a.from_status, a.to_status, a.note, a.created_at, u.name AS changed_by_name
+       FROM audit_logs a
+       LEFT JOIN users u ON a.changed_by = u.id
+       WHERE a.issue_id = $1
+       ORDER BY a.created_at ASC`,
+      [issue_id]
+    );
+
+    res.status(200).json({
+      data: audit.rows
+    });
+  } catch (err) {
+    console.error('[getIssueAuditLogs]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch audit logs.' });
+  }
+};
+
+module.exports = { createIssue, updateIssueStatus, getNearbyIssues, getMyIssues, getUpvotedIssues, getViewportIssues, watchIssue, unwatchIssue, meToo, getIssueAuditLogs };

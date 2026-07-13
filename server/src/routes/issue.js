@@ -10,17 +10,20 @@
  */
 const express   = require('express');
 const auth      = require('../middleware/auth');
+const optionalAuth = require('../middleware/optionalAuth');
 const roleGuard = require('../middleware/roleGuard');
 
 const {
   createIssue,
   getNearbyIssues,
   getMyIssues,
+  getUpvotedIssues,
   getViewportIssues,
   updateIssueStatus,
   watchIssue,
   unwatchIssue,
   meToo,
+  getIssueAuditLogs,
 } = require('../controller/issue');
 
 const router = express.Router();
@@ -29,20 +32,15 @@ const router = express.Router();
 
 /**
  * GET /api/issues/viewport
- * Public — returns issues within the map's visible bounding box.
- * Query params: sw_lng, sw_lat, ne_lng, ne_lat
+ * Optionally authenticated — returns is_watching + is_reporter flags for logged-in users.
  */
-router.get('/viewport', getViewportIssues);
+router.get('/viewport', optionalAuth, getViewportIssues);
 
 /**
  * GET /api/issues/nearby
- * Public — anyone can view nearby open issues on the map.
- * Query params: lat, lng, radius (metres, optional), category (optional)
- *
- * NOTE: This route MUST be defined before /:id routes to prevent Express
- *       from treating "nearby" as an :id parameter.
+ * Optionally authenticated — returns is_watching + is_reporter flags for logged-in users.
  */
-router.get('/nearby', getNearbyIssues);
+router.get('/nearby', optionalAuth, getNearbyIssues);
 
 /**
  * GET /api/issues/mine
@@ -50,6 +48,13 @@ router.get('/nearby', getNearbyIssues);
  * NOTE: Must be defined before /:id routes.
  */
 router.get('/mine', auth, getMyIssues);
+
+/**
+ * GET /api/issues/upvoted
+ * Authenticated — returns issues the user has upvoted (watched but not reported).
+ * NOTE: Must be defined before /:id routes.
+ */
+router.get('/upvoted', auth, getUpvotedIssues);
 
 /**
  * POST /api/issues
@@ -81,5 +86,11 @@ router.post('/:id/watch', auth, watchIssue);
  * Authenticated user unsubscribes from an issue.
  */
 router.delete('/:id/watch', auth, unwatchIssue);
+
+/**
+ * GET /api/issues/:id/audit-logs
+ * Authenticated user fetches audit logs for an issue.
+ */
+router.get('/:id/audit-logs', auth, getIssueAuditLogs);
 
 module.exports = router;

@@ -17,8 +17,12 @@ export const endpoints = {
   // ISSUE ENDPOINTS
   CREATE_ISSUE_API:        BASE_URL + "/issues",
   MY_ISSUES_API:           BASE_URL + "/issues/mine",
+  UPVOTED_ISSUES_API:      BASE_URL + "/issues/upvoted",
+  NEARBY_ISSUES_API:       BASE_URL + "/issues/nearby",
   VIEWPORT_ISSUES_API:     BASE_URL + "/issues/viewport",
   ME_TOO_API:              (id) => BASE_URL + "/issues/" + id + "/me-too",
+  UNWATCH_API:             (id) => BASE_URL + "/issues/" + id + "/watch",
+  GET_ISSUE_AUDIT_LOGS_API:(id) => BASE_URL + "/issues/" + id + "/audit-logs",
   // UPLOAD ENDPOINTS
   UPLOAD_SIGNATURE_API:    BASE_URL + "/upload/signature",
   // SUPER ADMIN ENDPOINTS

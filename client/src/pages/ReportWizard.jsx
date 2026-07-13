@@ -4,26 +4,23 @@
  * Top-level wizard container.
  * - Reads/writes `step` from the complaint Redux slice.
  * - Renders the active step sub-component.
- * - Back navigation preserves all earlier state.
  */
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { setStep, resetComplaint } from '../slices/complaintSlice';
 
-import StepIndicator   from '../components/complaint/StepIndicator';
+import StepIndicator     from '../components/complaint/StepIndicator';
 import Step1_ImageCapture from '../components/complaint/Step1_ImageCapture';
 import Step2_LocationPin  from '../components/complaint/Step2_LocationPin';
 import Step3_Description  from '../components/complaint/Step3_Description';
 import Step4_ReviewForm   from '../components/complaint/Step4_ReviewForm';
 
 export default function ReportWizard() {
-  const dispatch  = useDispatch();
-  const navigate  = useNavigate();
-  const step      = useSelector((s) => s.complaint.step);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const step     = useSelector((s) => s.complaint.step);
 
-  /** Advance to next step */
-  function goNext()           { dispatch(setStep(step + 1)); }
-  /** Go back one step, or exit wizard on step 1 */
+  function goNext()     { dispatch(setStep(step + 1)); }
   function goBack() {
     if (step <= 1) {
       dispatch(resetComplaint());
@@ -32,68 +29,48 @@ export default function ReportWizard() {
       dispatch(setStep(step - 1));
     }
   }
-  /** Jump directly to any step (for Edit links on Step 4) */
-  function goToStep(n)        { dispatch(setStep(n)); }
+  function goToStep(n) { dispatch(setStep(n)); }
 
-  // Start at step 1 (step 0 is the landing dashboard, not part of the wizard card)
   const activeStep = step < 1 ? 1 : step;
 
   return (
-    <div className="wizard-shell">
-      {/* Branding row */}
-      <div style={{ marginBottom: 28, textAlign: 'center' }}>
-        <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 4 }}>
-          NagarSeva
-        </p>
-        <h1 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-          Register a Civic Complaint
-        </h1>
-      </div>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 px-4 py-10 font-sans">
 
-      <div className="wizard-card">
-        <StepIndicator currentStep={activeStep} />
+      {/* Wizard Card */}
+      <div className="w-full max-w-2xl bg-white border border-gray-200 rounded-sm shadow-sm overflow-hidden animate-[cardSlideUp_0.35s_cubic-bezier(0.22,1,0.36,1)]">
 
-        {activeStep === 1 && (
-          <Step1_ImageCapture
-            onNext={goNext}
-          />
-        )}
-        {activeStep === 2 && (
-          <Step2_LocationPin
-            onNext={goNext}
-            onBack={goBack}
-          />
-        )}
-        {activeStep === 3 && (
-          <Step3_Description
-            onNext={goNext}
-            onBack={goBack}
-          />
-        )}
-        {activeStep === 4 && (
-          <Step4_ReviewForm
-            onBack={goBack}
-            onGoToStep={goToStep}
-          />
-        )}
+        {/* Card top strip — branding */}
+        <div className="bg-[#1e2a5a] px-8 py-3 flex items-center justify-between">
+          <span className="text-[10px] font-black text-white/70 uppercase tracking-widest">NagarSeva</span>
+          <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">Civic Complaint Portal</span>
+        </div>
+
+        {/* Card body */}
+        <div className="px-8 py-7">
+          {/* Headline */}
+          <div className="mb-6">
+            <h1 className="text-lg font-black text-gray-900">Register a Civic Complaint</h1>
+            <p className="text-[11px] text-gray-400 font-semibold mt-0.5">
+              Complete all {4} steps to submit your complaint for municipal action.
+            </p>
+          </div>
+
+          <StepIndicator currentStep={activeStep} />
+
+          <div className="mt-6">
+            {activeStep === 1 && <Step1_ImageCapture onNext={goNext} />}
+            {activeStep === 2 && <Step2_LocationPin onNext={goNext} onBack={goBack} />}
+            {activeStep === 3 && <Step3_Description onNext={goNext} onBack={goBack} />}
+            {activeStep === 4 && <Step4_ReviewForm onBack={goBack} onGoToStep={goToStep} />}
+          </div>
+        </div>
       </div>
 
       {/* Cancel link */}
       {activeStep < 4 && (
         <button
-          onClick={() => {
-            dispatch(resetComplaint());
-            navigate('/citizen', { replace: true });
-          }}
-          style={{
-            marginTop: 20,
-            background: 'none',
-            border: 'none',
-            color: 'var(--color-muted)',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-            textDecoration: 'underline',
-          }}
+          onClick={() => { dispatch(resetComplaint()); navigate('/citizen', { replace: true }); }}
+          className="mt-4 text-[11px] text-gray-400 hover:text-gray-600 font-semibold underline-offset-2 underline cursor-pointer transition"
         >
           Cancel &amp; return to dashboard
         </button>
@@ -101,3 +78,4 @@ export default function ReportWizard() {
     </div>
   );
 }
+

@@ -18,7 +18,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { apiConnector } from '../services/apiConnector';
 import { endpoints } from '../services/api';
-import '../styles/fieldworker.css';
+
 import FieldWorker_Navbar from '../components/core/fieldworker/FieldWorker_Navbar';
 import { FiCheckCircle } from 'react-icons/fi';
 

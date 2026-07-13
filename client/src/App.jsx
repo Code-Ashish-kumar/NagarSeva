@@ -6,6 +6,8 @@ import { checkAuth } from "./services/Operations/authAPI";
 
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import RoleRedirect from "./components/common/RoleRedirect";
+import CitizenLayout from "./components/common/CitizenLayout";
+
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -14,10 +16,11 @@ import CitizenDashboard from "./pages/CitizenDashboard";
 import FieldWorker_Home from "./pages/FieldWorker_Home";
 import FieldWorker_Reports from "./pages/FieldWorker_Reports";
 import IssueWorkPage from "./pages/IssueWorkPage";
-import AdminDashboard from "./pages/AdminDashboard";
+
 import ReportWizard from "./pages/ReportWizard";
 import MyComplaints from "./pages/MyComplaints";
 import CityPulse from "./pages/CityPulse";
+import UpvotedIssues from "./pages/UpvotedIssues";
 import Landing from "./pages/Landing";
 import Admin_Home from "./pages/Admin_Home";
 import Admin_Reports from "./pages/Admin_Reports";
@@ -52,39 +55,20 @@ export default function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
-      {/* Role-based protected dashboards */}
+      {/* Citizen routes nested under CitizenLayout */}
       <Route
-        path="/citizen"
         element={
           <ProtectedRoute roles={["CITIZEN"]}>
-            <CitizenDashboard />
+            <CitizenLayout />
           </ProtectedRoute>
         }
-      />
-      <Route
-        path="/citizen/report"
-        element={
-          <ProtectedRoute roles={["CITIZEN"]}>
-            <ReportWizard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/citizen/complaints"
-        element={
-          <ProtectedRoute roles={["CITIZEN"]}>
-            <MyComplaints />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/citizen/city-pulse"
-        element={
-          <ProtectedRoute roles={["CITIZEN"]}>
-            <CityPulse />
-          </ProtectedRoute>
-        }
-      />
+      >
+        <Route path="/citizen"                  element={<CitizenDashboard />} />
+        <Route path="/citizen/report"           element={<ReportWizard />} />
+        <Route path="/citizen/complaints"       element={<MyComplaints />} />
+        <Route path="/citizen/city-pulse"       element={<CityPulse />} />
+        <Route path="/citizen/upvoted"          element={<UpvotedIssues />} />
+      </Route>
       <Route
         path="/field-worker"
         element={
@@ -109,14 +93,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin/dashboard"
-        element={
-          <ProtectedRoute roles={["ADMIN"]}>
-            <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
       <Route
         path="/admin"
         element={

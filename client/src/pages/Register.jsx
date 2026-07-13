@@ -1,6 +1,19 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { register } from '../services/Operations/authAPI';
+import { 
+  FiUser, 
+  FiMail, 
+  FiLock, 
+  FiEye, 
+  FiEyeOff, 
+  FiArrowRight, 
+  FiMapPin, 
+  FiLayers, 
+  FiActivity,
+  FiBell,
+  FiAlertCircle
+} from 'react-icons/fi';
 
 function getStrength(password) {
   let score = 0;
@@ -12,7 +25,20 @@ function getStrength(password) {
 }
 
 const STRENGTH_LABELS = ['', 'Weak', 'Fair', 'Good', 'Strong'];
-const STRENGTH_COLORS = ['', 'var(--color-danger)', 'var(--color-warning)', 'var(--color-accent)', 'var(--color-success)'];
+const STRENGTH_COLORS = [
+  '', 
+  'bg-red-500 text-red-500', 
+  'bg-amber-500 text-amber-500', 
+  'bg-blue-500 text-blue-500', 
+  'bg-green-500 text-green-500'
+];
+
+const FEATURES = [
+  { icon: <FiMapPin className="w-5 h-5 text-sky-400" />, title: 'Pin-drop Reporting',      desc: 'Drop a pin, snap a photo, and report immediately' },
+  { icon: <FiLayers className="w-5 h-5 text-indigo-400" />, title: 'Smart Deduplication',     desc: 'Groups similar geographical reports automatically' },
+  { icon: <FiActivity className="w-5 h-5 text-emerald-400" />, title: 'Live Analytics',           desc: 'Real-time response audit dashboards' },
+  { icon: <FiBell className="w-5 h-5 text-violet-400" />, title: 'Instant Alerts',   desc: 'SMS and email notifications on resolution milestones' },
+];
 
 export default function Register() {
   const navigate = useNavigate();
@@ -70,162 +96,270 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2" style={{ background: 'var(--color-base)' }}>
-
-      {/* ── Left panel ── */}
-      <div
-        className="hidden lg:flex flex-col items-center justify-center px-12 py-16 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #0a0f1e 0%, #0c1a3a 50%, #0f2654 100%)' }}
+    <div className="relative min-h-screen grid grid-cols-1 lg:grid-cols-2 bg-[#f3f5f9] text-gray-800 font-sans">
+      
+      {/* Floating Home Button */}
+      <Link 
+        to="/" 
+        className="absolute top-6 right-6 px-4 py-2 bg-white hover:bg-gray-50 text-gray-800 text-xs font-extrabold rounded-sm transition border border-gray-200 shadow-xs flex items-center gap-1.5 cursor-pointer z-50 uppercase tracking-wider"
       >
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 20% 20%, rgba(56,189,248,0.10) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(56,189,248,0.06) 0%, transparent 60%)' }} />
+        <span>← Back to Home</span>
+      </Link>
 
-        <div className="relative z-10 text-center mb-12">
-          <div className="text-6xl mb-4" style={{ filter: 'drop-shadow(0 0 24px rgba(56,189,248,0.4))' }}>🏙️</div>
-          <h1 className="text-4xl font-extrabold tracking-tight mb-2" style={{ color: 'var(--color-primary)', letterSpacing: '-0.02em' }}>
-            Nagar<span style={{ color: 'var(--color-accent)' }}>Seva</span>
-          </h1>
-          <p className="text-sm leading-relaxed max-w-xs mx-auto" style={{ color: 'var(--color-secondary)' }}>
-            Join thousands of citizens making their city better, one report at a time.
+      {/* Left branding panel */}
+      <div className="hidden lg:flex flex-col items-center justify-center px-16 py-16 relative overflow-hidden bg-[#1e2a5a] text-white">
+        {/* Glow blobs */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent)] pointer-events-none" />
+        <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Brand Header */}
+        <div className="relative z-10 text-center mb-10 space-y-4">
+          <div className="w-14 h-14 rounded-xl bg-white/10 text-white border border-white/20 flex items-center justify-center text-2xl mx-auto shadow-lg">
+            🏛️
+          </div>
+          <div>
+            <h1 className="text-3xl font-black tracking-tight leading-none">
+              Nagar<span className="text-sky-300">Seva</span>
+            </h1>
+            <p className="text-xs text-white/50 font-bold uppercase tracking-widest leading-none mt-2">
+              Public Administration Portal
+            </p>
+          </div>
+          <p className="text-xs text-white/70 max-w-xs mx-auto leading-relaxed pt-2">
+            Join thousands of active citizens making their city better, one localized report at a time.
           </p>
         </div>
 
-        <div className="relative z-10 flex flex-col gap-3 w-full max-w-sm">
-          {[
-            { icon: '📍', title: 'Pin-drop Reporting',      desc: 'Drop a pin, snap a photo — done' },
-            { icon: '🧠', title: 'Smart Deduplication',     desc: 'Clusters duplicate reports automatically' },
-            { icon: '📊', title: 'Live Analytics',           desc: 'Real-time resolution dashboards' },
-            { icon: '🔔', title: 'Instant Notifications',   desc: 'Know when your issue is resolved' },
-          ].map((f) => (
-            <div key={f.title}
-              className="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(56,189,248,0.06)'; e.currentTarget.style.borderColor = 'rgba(56,189,248,0.2)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; }}
+        {/* Feature bullets */}
+        <div className="relative z-10 flex flex-col gap-3.5 w-full max-w-sm">
+          {FEATURES.map((f) => (
+            <div
+              key={f.title}
+              className="flex items-center gap-4 px-5 py-3.5 rounded-sm bg-white/5 border border-white/10 hover:border-white/20 transition-all duration-200"
             >
-              <span className="text-2xl shrink-0">{f.icon}</span>
+              <div className="w-9 h-9 rounded-sm bg-white/5 flex items-center justify-center flex-shrink-0">
+                {f.icon}
+              </div>
               <div>
-                <strong className="block text-sm font-semibold" style={{ color: 'var(--color-primary)' }}>{f.title}</strong>
-                <span className="text-xs" style={{ color: 'var(--color-muted)' }}>{f.desc}</span>
+                <strong className="block text-xs font-black text-white uppercase tracking-wider">{f.title}</strong>
+                <span className="text-[11px] text-white/60 block mt-0.5 leading-snug">{f.desc}</span>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* ── Right form panel ── */}
+      {/* Right form panel */}
       <div className="flex flex-col items-center justify-center px-6 py-12 sm:px-14 overflow-y-auto">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm bg-white border border-gray-200 rounded-sm p-8 sm:p-10 shadow-xs">
 
           {/* Step indicator */}
-          <div className="flex gap-2 mb-8">
-            <div className="h-1 flex-1 rounded-full" style={{ background: 'var(--color-accent)' }} />
-            <div className="h-1 flex-1 rounded-full" style={{ background: 'var(--color-elevated)' }} />
+          <div className="flex gap-2 mb-6 select-none">
+            <div className="h-1 flex-1 rounded-full bg-blue-600" />
+            <div className="h-1 flex-1 rounded-full bg-gray-100" />
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold tracking-tight mb-1" style={{ color: 'var(--color-primary)', letterSpacing: '-0.02em' }}>
+          <div className="mb-6 border-b pb-4 border-gray-100">
+            <h2 className="text-xl font-black text-gray-900 leading-tight">
               Create your account
             </h2>
-            <p className="text-sm" style={{ color: 'var(--color-secondary)' }}>Step 1 of 2 — Your details</p>
+            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1.5 leading-none">
+              Step 1 of 2 — Personal Details
+            </p>
           </div>
 
+          {/* Server error */}
           {serverErr && (
-            <div className="flex items-start gap-2 px-4 py-3 rounded-xl text-sm mb-5 leading-snug"
-              style={{ background: 'var(--color-danger-dim)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5' }}>
-              <span>⚠️</span><span>{serverErr}</span>
+            <div className="flex items-start gap-2.5 px-4 py-3 rounded-sm text-xs mb-5 leading-snug bg-red-50 border border-red-200 text-red-700">
+              <FiAlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+              <span className="font-bold">{serverErr}</span>
             </div>
           )}
 
-          <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+          <form className="space-y-4" onSubmit={handleSubmit} noValidate>
 
             {/* Full name */}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="reg-name" className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--color-secondary)' }}>
+            <div className="space-y-1.5">
+              <label htmlFor="reg-name" className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                 Full Name
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base pointer-events-none" style={{ color: 'var(--color-muted)' }}>👤</span>
-                <input id="reg-name" className={`form-input${errors.name ? ' input-error' : ''}`}
-                  type="text" name="name" placeholder="Rahul Sharma"
-                  value={form.name} onChange={handleChange} autoComplete="name" disabled={loading} />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <FiUser className="w-4 h-4" />
+                </span>
+                <input 
+                  id="reg-name" 
+                  className={`w-full bg-gray-50 border text-xs font-semibold pl-10 pr-4 py-3 rounded-sm focus:outline-none placeholder-gray-400 focus:bg-white focus:border-blue-500 transition duration-150 ${
+                    errors.name ? 'border-red-400' : 'border-gray-200'
+                  }`}
+                  type="text" 
+                  name="name" 
+                  placeholder="Rahul Sharma"
+                  value={form.name} 
+                  onChange={handleChange} 
+                  autoComplete="name" 
+                  disabled={loading} 
+                />
               </div>
-              {errors.name && <span className="text-xs" style={{ color: 'var(--color-danger)' }}>⚠ {errors.name}</span>}
+              {errors.name && (
+                <span className="text-[10px] text-red-650 font-bold flex items-center gap-1">
+                  ⚠️ {errors.name}
+                </span>
+              )}
             </div>
 
             {/* Email */}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="reg-email" className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--color-secondary)' }}>
+            <div className="space-y-1.5">
+              <label htmlFor="reg-email" className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                 Email Address
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base pointer-events-none" style={{ color: 'var(--color-muted)' }}>✉️</span>
-                <input id="reg-email" className={`form-input${errors.email ? ' input-error' : ''}`}
-                  type="email" name="email" placeholder="you@example.com"
-                  value={form.email} onChange={handleChange} autoComplete="email" disabled={loading} />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <FiMail className="w-4 h-4" />
+                </span>
+                <input 
+                  id="reg-email" 
+                  className={`w-full bg-gray-50 border text-xs font-semibold pl-10 pr-4 py-3 rounded-sm focus:outline-none placeholder-gray-400 focus:bg-white focus:border-blue-500 transition duration-150 ${
+                    errors.email ? 'border-red-400' : 'border-gray-200'
+                  }`}
+                  type="email" 
+                  name="email" 
+                  placeholder="you@example.com"
+                  value={form.email} 
+                  onChange={handleChange} 
+                  autoComplete="email" 
+                  disabled={loading} 
+                />
               </div>
-              {errors.email && <span className="text-xs" style={{ color: 'var(--color-danger)' }}>⚠ {errors.email}</span>}
+              {errors.email && (
+                <span className="text-[10px] text-red-650 font-bold flex items-center gap-1">
+                  ⚠️ {errors.email}
+                </span>
+              )}
             </div>
 
             {/* Password */}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="reg-password" className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--color-secondary)' }}>
+            <div className="space-y-1.5">
+              <label htmlFor="reg-password" className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                 Password
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base pointer-events-none" style={{ color: 'var(--color-muted)' }}>🔐</span>
-                <input id="reg-password" className={`form-input pr-10${errors.password ? ' input-error' : ''}`}
-                  type={showPwd ? 'text' : 'password'} name="password" placeholder="Min. 8 characters"
-                  value={form.password} onChange={handleChange} autoComplete="new-password" disabled={loading} />
-                <button type="button" onClick={() => setShowPwd((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-base bg-transparent border-none p-1"
-                  style={{ color: 'var(--color-muted)' }}>
-                  {showPwd ? '🙈' : '👁️'}
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <FiLock className="w-4 h-4" />
+                </span>
+                <input 
+                  id="reg-password" 
+                  className={`w-full bg-gray-50 border text-xs font-semibold pl-10 pr-10 py-3 rounded-sm focus:outline-none placeholder-gray-400 focus:bg-white focus:border-blue-500 transition duration-150 ${
+                    errors.password ? 'border-red-400' : 'border-gray-200'
+                  }`}
+                  type={showPwd ? 'text' : 'password'} 
+                  name="password" 
+                  placeholder="Min. 8 characters"
+                  value={form.password} 
+                  onChange={handleChange} 
+                  autoComplete="new-password" 
+                  disabled={loading} 
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowPwd((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-450 hover:text-gray-700 bg-transparent border-none p-1 cursor-pointer"
+                >
+                  {showPwd ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
                 </button>
               </div>
 
-              {/* Strength bar */}
+              {/* Password Strength Indicator */}
               {form.password && (
-                <div className="flex items-center gap-1.5 mt-1">
-                  {[1, 2, 3, 4].map((lvl) => (
-                    <div key={lvl} className="h-1 flex-1 rounded-full transition-all duration-300"
-                      style={{ background: lvl <= pwdStrength ? STRENGTH_COLORS[pwdStrength] : 'var(--color-elevated)' }} />
-                  ))}
-                  <span className="text-xs ml-1 shrink-0" style={{ color: STRENGTH_COLORS[pwdStrength] }}>
+                <div className="flex items-center gap-1.5 pt-1">
+                  {[1, 2, 3, 4].map((lvl) => {
+                    const colorClass = STRENGTH_COLORS[pwdStrength] || 'bg-gray-200';
+                    const activeColor = colorClass.split(' ')[0];
+                    return (
+                      <div 
+                        key={lvl} 
+                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                          lvl <= pwdStrength ? activeColor : 'bg-gray-100'
+                        }`}
+                      />
+                    );
+                  })}
+                  <span className={`text-[10px] ml-1 font-bold ${STRENGTH_COLORS[pwdStrength]?.split(' ')[1] || 'text-gray-400'}`}>
                     {STRENGTH_LABELS[pwdStrength]}
                   </span>
                 </div>
               )}
-              {errors.password && <span className="text-xs" style={{ color: 'var(--color-danger)' }}>⚠ {errors.password}</span>}
+              {errors.password && (
+                <span className="text-[10px] text-red-650 font-bold flex items-center gap-1">
+                  ⚠️ {errors.password}
+                </span>
+              )}
             </div>
 
-            {/* Confirm password */}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="reg-confirm" className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--color-secondary)' }}>
+            {/* Confirm Password */}
+            <div className="space-y-1.5">
+              <label htmlFor="reg-confirmPassword" className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">
                 Confirm Password
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base pointer-events-none" style={{ color: 'var(--color-muted)' }}>✅</span>
-                <input id="reg-confirm" className={`form-input pr-10${errors.confirmPassword ? ' input-error' : ''}`}
-                  type={showConfirm ? 'text' : 'password'} name="confirmPassword" placeholder="Repeat your password"
-                  value={form.confirmPassword} onChange={handleChange} autoComplete="new-password" disabled={loading} />
-                <button type="button" onClick={() => setShowConfirm((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-base bg-transparent border-none p-1"
-                  style={{ color: 'var(--color-muted)' }}>
-                  {showConfirm ? '🙈' : '👁️'}
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                  <FiLock className="w-4 h-4" />
+                </span>
+                <input 
+                  id="reg-confirmPassword" 
+                  className={`w-full bg-gray-50 border text-xs font-semibold pl-10 pr-10 py-3 rounded-sm focus:outline-none placeholder-gray-400 focus:bg-white focus:border-blue-500 transition duration-150 ${
+                    errors.confirmPassword ? 'border-red-400' : 'border-gray-200'
+                  }`}
+                  type={showConfirm ? 'text' : 'password'} 
+                  name="confirmPassword" 
+                  placeholder="Repeat your password"
+                  value={form.confirmPassword} 
+                  onChange={handleChange} 
+                  disabled={loading} 
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowConfirm((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-450 hover:text-gray-700 bg-transparent border-none p-1 cursor-pointer"
+                >
+                  {showConfirm ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
                 </button>
               </div>
-              {errors.confirmPassword && <span className="text-xs" style={{ color: 'var(--color-danger)' }}>⚠ {errors.confirmPassword}</span>}
+              {errors.confirmPassword && (
+                <span className="text-[10px] text-red-650 font-bold flex items-center gap-1">
+                  ⚠️ {errors.confirmPassword}
+                </span>
+              )}
             </div>
 
-            <button type="submit" className="btn-primary mt-1" disabled={loading}>
-              {loading ? <><span className="spinner" />Creating account...</> : 'Continue → Verify Email'}
+            {/* Submit */}
+            <button 
+              type="submit" 
+              className="w-full py-3 bg-[#1e2a5a] hover:bg-[#2d3f82] disabled:bg-gray-300 text-white text-xs font-extrabold rounded-sm shadow-sm transition duration-150 cursor-pointer flex items-center justify-center gap-1.5 mt-2"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                <>
+                  <span>Create Account</span>
+                  <FiArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
           </form>
 
-          <p className="text-center text-sm mt-6" style={{ color: 'var(--color-secondary)' }}>
+          <p className="text-center text-xs mt-8 pt-4 border-t border-gray-150 text-gray-550 font-semibold">
             Already have an account?{' '}
-            <Link to="/login" className="font-semibold" style={{ color: 'var(--color-accent)' }}>Sign in</Link>
+            <Link 
+              to="/login" 
+              className="font-black text-blue-600 hover:text-blue-700"
+            >
+              Sign In here
+            </Link>
           </p>
         </div>
       </div>

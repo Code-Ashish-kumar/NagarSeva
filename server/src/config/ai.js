@@ -1,10 +1,10 @@
 /**
  * src/config/ai.js
  *
- * AI-powered civic complaint analysis using Groq (Qwen 3.6 27B).
+ * AI-powered civic complaint analysis using Groq (Qwen 3 27B).
  * Uses the OpenAI-compatible Groq API for fast multimodal inference.
  *
- * Model: qwen/qwen3.6-27b
+ * Model: qwen/qwen3-27b
  *   - Natively multimodal (image + text)
  *   - Supports JSON mode
  *   - Dual-mode reasoning capabilities (reasoning field returned separately by Groq)

@@ -260,3 +260,57 @@
     font-size: 0.875rem;
   }
 }
+
+/* ── Leaflet Cluster & Marker Overrides ────────────────────────────────────── */
+.cluster-marker-wrap {
+  background: none !important;
+  border: none !important;
+}
+
+.cluster-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.85);
+  border: 3px solid rgba(56, 189, 248, 0.3);
+  box-shadow: 0 2px 12px rgba(56, 189, 248, 0.4);
+  color: #0a0f1e;
+  font-weight: 800;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.cluster-marker:hover {
+  transform: scale(1.15);
+}
+
+.issue-marker-wrap {
+  background: none !important;
+  border: none !important;
+}
+
+.issue-marker {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 2px solid #38bdf8;
+  border-radius: 50%;
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.issue-marker:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.4);
+}
+
+@keyframes cardSlideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+

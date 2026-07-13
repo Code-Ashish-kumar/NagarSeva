@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { apiConnector } from '../../../services/apiConnector';
 import { endpoints } from '../../../services/api';
+import AuditLogs from '../../common/AuditLogs';
 import { 
   FiMapPin, 
   FiUsers, 
@@ -226,6 +227,11 @@ const IssueDetailsModal = ({ issueId, onClose, workers = [], onAssign }) => {
                   <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
                     {detailedIssue.issue.description || 'No detailed description was provided by the reporter.'}
                   </div>
+                </div>
+
+                {/* Status Audit Trail Logs */}
+                <div className="bg-white p-5 rounded-md shadow-md">
+                  <AuditLogs issueId={detailedIssue.issue.id} />
                 </div>
 
               </div>

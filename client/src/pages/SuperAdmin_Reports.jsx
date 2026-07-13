@@ -4,6 +4,7 @@ import IssueCard from '../components/core/admin/IssueCard';
 import { apiConnector } from '../services/apiConnector';
 import { endpoints } from '../services/api';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import AuditLogs from '../components/common/AuditLogs';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { 
@@ -293,6 +294,11 @@ const SuperAdmin_Reports = () => {
                       <div className="text-sm text-gray-650 whitespace-pre-wrap leading-relaxed">
                         {detail.issue.description || 'No description was provided.'}
                       </div>
+                    </div>
+
+                    {/* Status Audit Trail Tracker */}
+                    <div className="bg-white p-5 rounded-md border border-gray-150 shadow-sm">
+                      <AuditLogs issueId={detail.issue.id} />
                     </div>
 
                   </div>

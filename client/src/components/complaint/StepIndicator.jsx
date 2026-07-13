@@ -1,34 +1,67 @@
 /**
  * components/complaint/StepIndicator.jsx
  *
- * Visual breadcrumb showing the 4 wizard steps.
- * Props:
- *   currentStep  {number}  1–4 (the active step)
+ * Horizontal step bar with connecting lines.
+ * - Completed steps: filled navy circle + checkmark
+ * - Active step:     navy outline circle with number + inline label
+ * - Inactive steps:  gray circle + gray label
  */
 const STEPS = [
-  { id: 1, label: 'Image'       },
-  { id: 2, label: 'Location'    },
-  { id: 3, label: 'Description' },
+  { id: 1, label: 'Add Photos'  },
+  { id: 2, label: 'Pin Location' },
+  { id: 3, label: 'Describe'    },
   { id: 4, label: 'Review'      },
 ];
 
 export default function StepIndicator({ currentStep }) {
   return (
-    <div className="step-indicator" role="navigation" aria-label="Wizard steps">
-      {STEPS.map((step) => {
+    <div className="flex items-center mb-8" role="navigation" aria-label="Wizard steps">
+      {STEPS.map((step, idx) => {
+        const isCompleted = step.id < currentStep;
         const isActive    = step.id === currentStep;
-        const isCompleted = step.id <  currentStep;
-        const className   = `step-node${isActive ? ' active' : ''}${isCompleted ? ' completed' : ''}`;
 
         return (
-          <div key={step.id} className={className}>
-            <div className="step-bubble" aria-current={isActive ? 'step' : undefined}>
-              {isCompleted ? '✓' : step.id}
+          <div key={step.id} className="flex items-center flex-1 last:flex-none">
+
+            {/* Circle + label */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black border-2 transition-all duration-200
+                  ${isCompleted
+                    ? 'bg-[#1e2a5a] border-[#1e2a5a] text-white'
+                    : isActive
+                    ? 'bg-white border-[#1e2a5a] text-[#1e2a5a]'
+                    : 'bg-white border-gray-300 text-gray-400'
+                  }`}
+                aria-current={isActive ? 'step' : undefined}
+              >
+                {isCompleted ? '✓' : step.id}
+              </div>
+
+              <span
+                className={`text-[11px] font-bold whitespace-nowrap select-none transition-all duration-200
+                  ${isCompleted
+                    ? 'text-[#1e2a5a]'
+                    : isActive
+                    ? 'text-[#1e2a5a]'
+                    : 'text-gray-400'
+                  }`}
+              >
+                {step.label}
+              </span>
             </div>
-            <span className="step-label">{step.label}</span>
+
+            {/* Connector line — not after last step */}
+            {idx < STEPS.length - 1 && (
+              <div
+                className={`flex-1 h-[2px] mx-3 rounded-full transition-all duration-300
+                  ${isCompleted ? 'bg-[#1e2a5a]' : 'bg-gray-200'}`}
+              />
+            )}
           </div>
         );
       })}
     </div>
   );
 }
+

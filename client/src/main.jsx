@@ -5,11 +5,6 @@ import { Provider } from "react-redux";
 import { store } from "./store/store";
 import App from "./App.jsx";
 import "./styles/globals.css";
-import "./styles/complaint.css";
-import "./styles/citypulse.css";
-import "./styles/superadmin.css";
-import "./styles/landing.css";
-import "./styles/fieldworker.css";
 
 
 ReactDOM.createRoot(document.getElementById("root")).render(
