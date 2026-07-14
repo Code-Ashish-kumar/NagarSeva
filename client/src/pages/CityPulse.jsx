@@ -193,7 +193,8 @@ export default function CityPulse() {
       abortRef.current = new AbortController();
       try {
         const params = `sw_lng=${newBounds.sw_lng}&sw_lat=${newBounds.sw_lat}&ne_lng=${newBounds.ne_lng}&ne_lat=${newBounds.ne_lat}`;
-        const res = await fetch(`${endpoints.VIEWPORT_ISSUES_API}?${params}`, {
+        const apiBase = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${apiBase}${endpoints.VIEWPORT_ISSUES_API}?${params}`, {
           signal: abortRef.current.signal,
           credentials: 'include',
         });

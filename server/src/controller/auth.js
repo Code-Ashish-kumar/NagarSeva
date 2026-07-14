@@ -76,10 +76,11 @@ function parseDurationMs(duration) {
 /** Set the JWT as an httpOnly cookie on the response */
 function setTokenCookie(res, token) {
   const maxAge = parseDurationMs(process.env.JWT_EXPIRES_IN || '7d');
+  const isProduction = process.env.NODE_ENV === 'production';
   res.cookie('token', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in prod; works on HTTP in dev
-    sameSite: 'lax',                               // 'lax' works with Vite proxy; 'strict' breaks cross-origin dev
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',  // 'none' required for cross-origin (Vercel→Render)
     maxAge,
   });
 }
@@ -371,10 +372,11 @@ const me = async (req, res) => {
  * Clears the JWT cookie.
  */
 const logout = async (req, res) => {
+  const isProduction = process.env.NODE_ENV === 'production';
   res.clearCookie('token', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
   });
   res.status(200).json({ message: 'Logged out successfully.' });
 };
@@ -521,7 +523,8 @@ const resetPassword = async (req, res) => {
     }
 
     // Clear any existing cookie (force re-login with new password)
-    res.clearCookie('token', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' });
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.clearCookie('token', { httpOnly: true, secure: isProduction, sameSite: isProduction ? 'none' : 'lax' });
 
     res.status(200).json({
       message: 'Password reset successfully! Please log in with your new password.',
