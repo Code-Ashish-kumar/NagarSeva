@@ -70,7 +70,7 @@ export default function CitizenLayout() {
 
       {/* Sticky Top Navbar */}
       <header className="sticky top-0 z-[2000] bg-[#1e2a5a] text-white shadow-md border-b border-white/5 backdrop-blur-md">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
 
           {/* Logo / Branding */}
           <div
@@ -93,8 +93,8 @@ export default function CitizenLayout() {
                   key={item.path}
                   onClick={() => navigate(item.path)}
                   className={`px-4 py-2.5 rounded-sm text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer select-none ${isActive
-                      ? 'bg-white/10 text-white border-b-2 border-blue-400'
-                      : 'text-white/80 hover:text-white hover:bg-white/5 border-b-2 border-transparent'
+                      ? 'bg-white/10 text-white shadow-inner'
+                      : 'text-white/80 hover:text-white hover:bg-white/5'
                     }`}
                 >
                   <Icon className="w-3.5 h-3.5" />

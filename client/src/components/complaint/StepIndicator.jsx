@@ -27,9 +27,9 @@ export default function StepIndicator({ currentStep }) {
           <div key={step.id} className="flex items-center flex-1 last:flex-none">
 
             {/* Circle + label */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-col md:flex-row items-center gap-2 shrink-0">
               <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black border-2 transition-all duration-200
+                className={`w-5 h-5 md:w-7 md:h-7 rounded-full flex items-center justify-center text-[11px] font-black border-2 transition-all duration-200
                   ${isCompleted
                     ? 'bg-[#1e2a5a] border-[#1e2a5a] text-white'
                     : isActive
@@ -41,8 +41,8 @@ export default function StepIndicator({ currentStep }) {
                 {isCompleted ? '✓' : step.id}
               </div>
 
-              <span
-                className={`text-[11px] font-bold whitespace-nowrap select-none transition-all duration-200
+              <div
+                className={`text-[7px] md:text-[11px] font-bold whitespace-nowrap select-none transition-all duration-200
                   ${isCompleted
                     ? 'text-[#1e2a5a]'
                     : isActive
@@ -51,7 +51,7 @@ export default function StepIndicator({ currentStep }) {
                   }`}
               >
                 {step.label}
-              </span>
+              </div>
             </div>
 
             {/* Connector line — not after last step */}

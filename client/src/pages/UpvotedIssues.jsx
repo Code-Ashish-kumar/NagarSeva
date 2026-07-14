@@ -324,7 +324,7 @@ export default function UpvotedIssues() {
               {/* Description */}
               <div className="space-y-1">
                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">Description</span>
-                <p className="text-xs text-gray-650 font-semibold bg-gray-50 border border-gray-150 p-3 rounded-sm leading-relaxed whitespace-pre-wrap">
+                <p className="text-xs text-gray-600 font-semibold bg-gray-100 shadow-sm p-3 rounded-sm leading-relaxed whitespace-pre-wrap">
                   {selectedIssue.description || 'No description provided.'}
                 </p>
               </div>
@@ -348,25 +348,25 @@ export default function UpvotedIssues() {
               {/* Meta grid */}
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-150">
                 <div>
-                  <span className="text-[9px] text-gray-450 font-extrabold uppercase tracking-wider flex items-center gap-1">
+                  <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-wider flex items-center gap-1">
                     <FiCalendar className="w-3 h-3 text-indigo-500" /> Date Reported
                   </span>
                   <p className="text-xs font-bold text-gray-600 mt-0.5">{formatDate(selectedIssue.created_at)}</p>
                 </div>
                 <div>
-                  <span className="text-[9px] text-gray-450 font-extrabold uppercase tracking-wider flex items-center gap-1">
+                  <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-wider flex items-center gap-1">
                     <FiClock className="w-3 h-3 text-indigo-500" /> Last Activity
                   </span>
                   <p className="text-xs font-bold text-gray-600 mt-0.5">{formatDate(selectedIssue.updated_at)}</p>
                 </div>
                 <div>
-                  <span className="text-[9px] text-gray-450 font-extrabold uppercase tracking-wider flex items-center gap-1">
+                  <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-wider flex items-center gap-1">
                     <FiUsers className="w-3 h-3 text-indigo-500" /> Upvotes / Reports
                   </span>
                   <p className="text-xs font-bold text-gray-600 mt-0.5">👥 {selectedIssue.report_count} supports</p>
                 </div>
                 <div>
-                  <span className="text-[9px] text-gray-450 font-extrabold uppercase tracking-wider flex items-center gap-1">
+                  <span className="text-[9px] text-gray-400 font-extrabold uppercase tracking-wider flex items-center gap-1">
                     <FiActivity className="w-3 h-3 text-indigo-500" /> Priority Score
                   </span>
                   <p className="text-xs font-bold text-gray-600 mt-0.5">⬆ {selectedIssue.priority_score}</p>
@@ -375,7 +375,7 @@ export default function UpvotedIssues() {
             </div>
 
             {/* Modal footer */}
-            <div className="p-4 bg-gray-50 border-t border-gray-150 flex items-center justify-between gap-3">
+            <div className="p-4 bg-gray-50 border-t border-gray-150 flex items-center justify-end gap-3">
               <button
                 onClick={(e) => handleRemove(selectedIssue.id, e)}
                 disabled={removeLoading[selectedIssue.id]}
@@ -386,12 +386,12 @@ export default function UpvotedIssues() {
                   : <span>Remove Upvote</span>
                 }
               </button>
-              <button
+              {/* <button
                 className="px-5 py-2.5 bg-[#1e2a5a] hover:bg-[#2d3f82] text-white text-xs font-extrabold rounded-sm transition cursor-pointer"
                 onClick={() => setSelectedIssue(null)}
               >
                 Close
-              </button>
+              </button> */}
             </div>
           </div>
         </div>

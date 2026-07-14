@@ -15,6 +15,7 @@ export const endpoints = {
   // COMPLAINT ENDPOINTS
   ANALYZE_COMPLAINT_API:   BASE_URL + "/complaints/analyze",
   // ISSUE ENDPOINTS
+  PUBLIC_ISSUE_STATS_API:  BASE_URL + "/issues/public-stats",
   CREATE_ISSUE_API:        BASE_URL + "/issues",
   MY_ISSUES_API:           BASE_URL + "/issues/mine",
   UPVOTED_ISSUES_API:      BASE_URL + "/issues/upvoted",

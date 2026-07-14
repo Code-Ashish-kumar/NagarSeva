@@ -87,12 +87,12 @@ export default function AuditLogs({ issueId }) {
       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Status Trail Tracker</span>
       
       {logs.length === 0 ? (
-        <div className="p-4 bg-gray-50 border border-gray-150 rounded-sm text-xs font-semibold text-gray-500 flex items-center gap-2">
+        <div className="p-4 bg-gray-100 rounded-sm text-xs shadow-sm font-semibold text-gray-500 flex items-center gap-2">
           <FiInfo className="w-4 h-4 text-blue-500 shrink-0" />
           <span>No updates logged yet. Issue is currently under review.</span>
         </div>
       ) : (
-        <div className="relative border-l border-gray-200 ml-2.5 pl-6 space-y-6 py-2">
+        <div className="relative bg-gray border-l border-gray-200 ml-2.5 pl-6 space-y-6 py-2">
           {logs.map((log, idx) => {
             const stepColor = STATUS_COLORS[log.to_status] || 'bg-gray-400 border-gray-200';
             const fromLabel = STATUS_LABELS[log.from_status];
@@ -126,7 +126,7 @@ export default function AuditLogs({ issueId }) {
 
                   {/* Note message box */}
                   {log.note && (
-                    <div className="p-3 bg-gray-50 border border-gray-150 rounded-sm text-[11px] text-gray-600 font-semibold leading-relaxed flex items-start gap-1.5 max-w-lg shadow-inner">
+                    <div className="p-3 bg-gray-100 shadow-sm rounded-sm text-[11px] text-gray-600 font-semibold leading-relaxed flex items-start gap-1.5 max-w-lg shadow-inner">
                       <FiMessageSquare className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
                       <p>{log.note}</p>
                     </div>

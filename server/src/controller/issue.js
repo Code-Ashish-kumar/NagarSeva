@@ -490,6 +490,37 @@ const getUpvotedIssues = async (req, res) => {
  */
 const ENDORSE_RADIUS_METRES = 20000;
 
+/**
+ * GET /api/issues/public-stats
+ * Public aggregate counts for the landing page.
+ */
+const getPublicIssueStats = async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) AS total_issues,
+        COUNT(*) FILTER (WHERE status IN ('ASSIGNED', 'IN_PROGRESS')) AS assigned_active,
+        COUNT(*) FILTER (WHERE status = 'RESOLVED') AS resolved_issues,
+        COUNT(*) FILTER (WHERE status = 'SUBMITTED') AS submitted_pending,
+        COUNT(*) FILTER (WHERE status = 'REJECTED') AS rejected_issues
+      FROM issues
+    `);
+
+    const row = result.rows[0] || {};
+
+    res.status(200).json({
+      total_issues: Number(row.total_issues || 0),
+      assigned_active: Number(row.assigned_active || 0),
+      resolved_issues: Number(row.resolved_issues || 0),
+      submitted_pending: Number(row.submitted_pending || 0),
+      rejected_issues: Number(row.rejected_issues || 0),
+    });
+  } catch (err) {
+    console.error('[getPublicIssueStats]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch public stats.' });
+  }
+};
+
 const meToo = async (req, res) => {
   const issue_id = req.params.id;
   const user_id = req.user.id;
@@ -696,4 +727,4 @@ const getIssueAuditLogs = async (req, res) => {
   }
 };
 
-module.exports = { createIssue, updateIssueStatus, getNearbyIssues, getMyIssues, getUpvotedIssues, getViewportIssues, watchIssue, unwatchIssue, meToo, getIssueAuditLogs };
+module.exports = { createIssue, updateIssueStatus, getPublicIssueStats, getNearbyIssues, getMyIssues, getUpvotedIssues, getViewportIssues, watchIssue, unwatchIssue, meToo, getIssueAuditLogs };

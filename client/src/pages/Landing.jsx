@@ -4,10 +4,12 @@
  * Public homepage — accessible without authentication.
  * Redesigned with premium landing layout, sticky top navbar, and high-impact hero.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import HowItWorks from '../components/core/landing/HowItWorks';
+import { apiConnector } from '../services/apiConnector';
+import { endpoints } from '../services/api';
 import {
   FiArrowRight,
   FiCheckCircle,
@@ -68,6 +70,44 @@ export default function Landing() {
   const { isAuthenticated } = useSelector((s) => s.auth);
   const workflowRef = useScrollReveal();
   const featuresRef = useScrollReveal();
+  const [publicStats, setPublicStats] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPublicStats() {
+      try {
+        const data = await apiConnector('GET', endpoints.PUBLIC_ISSUE_STATS_API);
+        if (isMounted) setPublicStats(data);
+      } catch {
+        if (isMounted) setPublicStats(null);
+      }
+    }
+
+    loadPublicStats();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const dashboardStats = [
+    {
+      label: 'Submitted Inquiries',
+      value: publicStats ? publicStats.total_issues.toLocaleString() : '—',
+      valueClass: 'text-white',
+    },
+    {
+      label: 'Assigned & Active',
+      value: publicStats ? publicStats.assigned_active.toLocaleString() : '—',
+      valueClass: 'text-sky-400',
+    },
+    {
+      label: 'Verified Resolutions',
+      value: publicStats ? publicStats.resolved_issues.toLocaleString() : '—',
+      valueClass: 'text-emerald-400',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#f3f5f9] text-gray-800 font-sans selection:bg-[#1e2a5a] selection:text-white">
@@ -79,7 +119,7 @@ export default function Landing() {
             <span className="text-lg" role="img" aria-label="logo">🏛️</span>
           </div>
           <div className="flex flex-col">
-            <span className="font-black text-base text-white tracking-wider leading-tight">
+            <span className="font-black tracking-wider leading-tight" style={{ fontSize: '1rem', color: '#ffffff' }}>
               NagarSeva
             </span>
             <span className="text-[10px] text-white/50 font-bold uppercase tracking-widest leading-none mt-0.5">
@@ -122,7 +162,7 @@ export default function Landing() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 lg:py-32 bg-gradient-to-b from-[#1e2a5a] to-[#2d3f82] text-white">
+      <section className="relative overflow-hidden py-20 lg:py-32 bg-linear-to-b from-[#1e2a5a] to-[#2d3f82] text-white">
         {/* Soft decorative blur grids */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(56,189,248,0.15),transparent)] pointer-events-none" />
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -137,11 +177,11 @@ export default function Landing() {
             </span>
 
             <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-tight">
-              Your City. <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-300">Your Voice.</span><br />
+              Your City. <span className="text-transparent bg-clip-text bg-linear-to-r from-sky-400 to-indigo-300">Your Voice.</span><br />
               Real Change.
             </h1>
 
-            <p className="text-white text-sm sm:text-base max-w-2xl leading-relaxed">
+            <p className="text-gray-300 text-sm max-w-2xl leading-relaxed">
               Report civic issues like potholes, streetlights, or sewage hazards in seconds. Our automated routing system ensures complaints get verified, dispatched, and resolved with photographic proof.
             </p>
 
@@ -164,25 +204,21 @@ export default function Landing() {
 
           {/* Side preview dashboard mockup */}
           <div className="lg:col-span-5 hidden lg:block relative">
-            <div className="absolute inset-0 bg-gradient-to-tr from-sky-500/10 to-indigo-500/10 rounded-md blur-xl" />
+            <div className="absolute inset-0 bg-linear-to-tr from-sky-500/10 to-indigo-500/10 rounded-md blur-xl" />
             <div className="relative bg-white/10 backdrop-blur-md border border-white/20 rounded-md p-6 shadow-2xl space-y-4">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <span className="text-xs font-bold tracking-wider text-white/80">LIVE RESOLUTION STATS</span>
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               </div>
               <div className="space-y-3">
-                <div className="bg-white/5 border border-white/5 p-3 rounded-sm flex items-center justify-between">
-                  <span className="text-xs text-white/70">Submitted Inquiries</span>
-                  <span className="text-xs font-extrabold text-white">4,812</span>
-                </div>
-                <div className="bg-white/5 border border-white/5 p-3 rounded-sm flex items-center justify-between">
-                  <span className="text-xs text-white/70">Assigned &amp; Active</span>
-                  <span className="text-xs font-extrabold text-sky-400">1,209</span>
-                </div>
-                <div className="bg-white/5 border border-white/5 p-3 rounded-sm flex items-center justify-between">
-                  <span className="text-xs text-white/70">Verified Resolutions</span>
-                  <span className="text-xs font-extrabold text-emerald-400">3,603</span>
-                </div>
+                {dashboardStats.map((stat) => (
+                  <div key={stat.label} className="bg-white/5 border border-white/5 p-3 rounded-sm flex items-center justify-between">
+                    <span className="text-xs text-white/70">{stat.label}</span>
+                    <span className={`text-xs font-extrabold ${stat.valueClass}`}>
+                      {stat.value}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -229,12 +265,12 @@ export default function Landing() {
             {FEATURES.map((f, i) => (
               <div
                 key={f.title}
-                className="reveal-item p-6 rounded-sm border border-gray-150 hover:border-gray-250 hover:shadow-xs transition duration-200 space-y-4"
+                className="reveal-item p-6 rounded-sm shadow-sm hover:border-gray-250 hover:shadow-xs transition duration-200 space-y-4"
               >
-                <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
                   {f.icon}
                 </div>
-                <h3 className="font-extrabold text-base text-gray-900">{f.title}</h3>
+                <h3 className="font-extrabold" style={{ fontSize: '1rem', color: '#111827' }}>{f.title}</h3>
                 <p className="text-xs text-gray-550 leading-relaxed font-semibold">{f.desc}</p>
               </div>
             ))}
@@ -245,7 +281,7 @@ export default function Landing() {
 
       {/* CTA Section */}
       <section className="py-16 sm:py-24 max-w-5xl mx-auto px-6">
-        <div className="bg-gradient-to-tr from-[#1e2a5a] to-[#2d3f82] text-white p-8 sm:p-16 rounded-sm shadow-xl relative overflow-hidden text-center space-y-6">
+        <div className="bg-linear-to-tr from-[#1e2a5a] to-[#2d3f82] text-white p-8 sm:p-16 rounded-sm shadow-xl relative overflow-hidden text-center space-y-6">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.1),transparent)] pointer-events-none" />
 
           <h2 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">

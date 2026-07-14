@@ -19,6 +19,7 @@ const {
   getMyIssues,
   getUpvotedIssues,
   getViewportIssues,
+  getPublicIssueStats,
   updateIssueStatus,
   watchIssue,
   unwatchIssue,
@@ -29,6 +30,12 @@ const {
 const router = express.Router();
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/issues/public-stats
+ * Public aggregate counts used by the landing page.
+ */
+router.get('/public-stats', getPublicIssueStats);
 
 /**
  * GET /api/issues/viewport

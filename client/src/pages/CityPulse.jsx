@@ -501,8 +501,8 @@ export default function CityPulse() {
               {/* Description */}
               {selectedIssue.description && (
                 <div className="space-y-1">
-                  <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block">Issue description</span>
-                  <p className="text-xs text-gray-650 font-semibold bg-gray-50 border border-gray-150 p-3 rounded-sm leading-relaxed whitespace-pre-wrap">
+                  <span className="text-[9px] text-gray-600 font-bold uppercase tracking-wider block">Issue description</span>
+                  <p className="text-xs text-gray-600 font-semibold bg-gray-100 shadow-sm p-3 rounded-sm leading-relaxed whitespace-pre-wrap">
                     {selectedIssue.description}
                   </p>
                 </div>

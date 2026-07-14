@@ -290,7 +290,7 @@ export default function MyComplaints() {
               {/* Description */}
               <div className="space-y-1">
                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Description</span>
-                <p className="text-xs text-gray-600 font-semibold bg-gray-50 border border-gray-150 p-3 rounded-sm leading-relaxed whitespace-pre-wrap">
+                <p className="text-xs text-gray-600 font-semibold bg-gray-100 shadow-sm p-3 rounded-sm leading-relaxed whitespace-pre-wrap">
                   {selectedIssue.description || 'No description provided.'}
                 </p>
               </div>

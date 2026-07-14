@@ -229,7 +229,7 @@ export default function Step2_LocationPin({ onNext, onBack }) {
             <input
               id="address-input"
               type="text"
-              className="flex-1 text-[11px] font-semibold text-gray-800 bg-transparent border-none outline-none placeholder-gray-400 py-1"
+              className="flex-1 text-[10px] font-semibold text-gray-800 bg-transparent border-none outline-none placeholder-gray-400 py-1"
               placeholder="e.g. Near SBI Bank, MG Road, Ranchi"
               value={userAddress}
               onChange={handleAddressChange}
@@ -244,10 +244,12 @@ export default function Step2_LocationPin({ onNext, onBack }) {
               <button
                 type="button"
                 onClick={handleUseDetected}
-                className="w-full flex items-center justify-center gap-1.5 py-2 text-[10px] font-extrabold text-[#1e2a5a] bg-[#1e2a5a]/5 hover:bg-[#1e2a5a]/10 border border-[#1e2a5a]/15 rounded-sm transition cursor-pointer uppercase tracking-wider"
+                className="w-full flex items-center justify-center gap-1.5 py-2 text-[7px] md:text-[10px] font-extrabold text-[#1e2a5a] bg-[#1e2a5a]/5 hover:bg-[#1e2a5a]/10 border border-[#1e2a5a]/15 rounded-sm transition cursor-pointer uppercase md:tracking-wider"
               >
                 <FiCompass className="w-3 h-3" />
-                Use detected address
+                <span className="text-[10px] font-extrabold uppercase tracking-wider">
+                  Use detected address
+                </span>
               </button>
             </div>
           )}

@@ -328,7 +328,7 @@ export default function CitizenDashboard() {
                     </h3>
 
                     {issue.description && (
-                      <p className="text-xs text-gray-600 leading-relaxed font-medium bg-gray-50 border border-gray-150 p-3 rounded-sm">
+                      <p className="text-xs text-gray-600 leading-relaxed font-medium bg-gray-100 shadow-sm p-3 rounded-sm">
                         {issue.description}
                       </p>
                     )}
