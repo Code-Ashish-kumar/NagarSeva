@@ -2,21 +2,27 @@
  * components/complaint/Step2_LocationPin.jsx
  *
  * Responsibilities:
- *  1. Request browser geolocation on mount.
- *  2. Render a Leaflet map centred on user position (or default centre of India).
- *  3. Draggable marker — on drag end dispatch setLocation.
+ *  1. Request browser geolocation on mount — skipped if location already saved (back-nav).
+ *  2. Render a Leaflet map centred on user position (or centre of India fallback).
+ *  3. Draggable marker + click-to-place — dispatches setLocation on every change.
  *  4. Reverse-geocode via Nominatim for a suggested address.
- *  5. Editable address field for user to refine/enter manually.
+ *  5. Editable address field the user can refine manually.
  *  6. "Next" is disabled until a pin has been placed.
- *  7. Redesigned to pure Tailwind CSS.
+ *
+ * Bug fixes vs previous version:
+ *  - userAddressRef prevents stale closure in handlePinDrop (address typed by user
+ *    was being overwritten when pin was dragged after typing).
+ *  - GPS acquisition is skipped when a saved location already exists (back-nav no
+ *    longer silently resets a manually placed pin).
+ *  - Removed unused FiMapPin import.
  */
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { setLocation } from '../../slices/complaintSlice';
-import { FiLoader, FiCheckCircle, FiAlertTriangle, FiMapPin, FiCompass } from 'react-icons/fi';
+import { FiLoader, FiCheckCircle, FiAlertTriangle, FiCompass } from 'react-icons/fi';
 
 // Fix Leaflet's default icon paths broken by Vite bundling
 delete L.Icon.Default.prototype._getIconUrl;
@@ -42,9 +48,7 @@ function PinDropHandler({ onPinDrop }) {
 function FlyToLocation({ center, zoom }) {
   const map = useMapEvents({});
   useEffect(() => {
-    if (center) {
-      map.flyTo([center.lat, center.lng], zoom, { duration: 1.2 });
-    }
+    if (center) map.flyTo([center.lat, center.lng], zoom, { duration: 1.2 });
   }, [center, zoom, map]);
   return null;
 }
@@ -66,17 +70,37 @@ export default function Step2_LocationPin({ onNext, onBack }) {
   const dispatch = useDispatch();
   const saved    = useSelector((s) => s.complaint.location);
 
-  const [center, setCenter]       = useState(saved ?? DEFAULT_CENTER);
-  const [zoom,   setZoom]         = useState(saved ? LOCATED_ZOOM : DEFAULT_ZOOM);
-  const [pin,    setPin]          = useState(saved);
-  const [geoStatus, setGeoStatus] = useState('pending');
+  const [center,      setCenter]      = useState(saved ?? DEFAULT_CENTER);
+  const [zoom,        setZoom]        = useState(saved ? LOCATED_ZOOM : DEFAULT_ZOOM);
+  const [pin,         setPin]         = useState(saved ?? null);
+  const [geoStatus,   setGeoStatus]   = useState(saved ? 'granted' : 'pending');
   const [autoAddress, setAutoAddress] = useState(saved?.address ?? null);
   const [userAddress, setUserAddress] = useState(saved?.userAddress ?? '');
   const [geocoding,   setGeocoding]   = useState(false);
   const [flyTarget,   setFlyTarget]   = useState(null);
-  const mapRef = useRef(null);
 
+  // Ref so handlePinDrop always reads the live userAddress without going stale
+  const userAddressRef = useRef(userAddress);
+  useEffect(() => { userAddressRef.current = userAddress; }, [userAddress]);
+
+  // Stable callback — reads userAddress via ref to avoid stale closures
+  const handlePinDrop = useCallback(async (loc) => {
+    setPin(loc);
+    setGeocoding(true);
+    const addr = await reverseGeocode(loc.lat, loc.lng);
+    setAutoAddress(addr);
+    setGeocoding(false);
+
+    // Keep the address field empty — user must explicitly click "Use detected address"
+    const currentUserAddr = userAddressRef.current;
+
+    const finalAddress = currentUserAddr.trim() || addr || '';    dispatch(setLocation({ ...loc, address: finalAddress, userAddress: currentUserAddr }));
+  }, [dispatch]);
+
+  // Geolocation on mount — skip if we already have a saved location (back-nav)
   useEffect(() => {
+    if (saved) return;   // ← BUG FIX: don't overwrite a manually placed pin on back-nav
+
     if (!navigator.geolocation) {
       setGeoStatus('denied');
       return;
@@ -95,21 +119,7 @@ export default function Step2_LocationPin({ onNext, onBack }) {
       },
       { timeout: 8000, enableHighAccuracy: true }
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function handlePinDrop(loc) {
-    setPin(loc);
-    setGeocoding(true);
-    const addr = await reverseGeocode(loc.lat, loc.lng);
-    setAutoAddress(addr);
-    setGeocoding(false);
-    if (!userAddress.trim()) {
-      setUserAddress(addr || '');
-    }
-    const finalAddress = userAddress.trim() || addr || '';
-    dispatch(setLocation({ ...loc, address: finalAddress, userAddress: finalAddress }));
-  }
+  }, [saved, handlePinDrop]);
 
   function handleAddressChange(e) {
     const val = e.target.value;
@@ -145,9 +155,10 @@ export default function Step2_LocationPin({ onNext, onBack }) {
           <p className="text-[11px] text-gray-400 font-semibold mt-0.5">
             {geoStatus === 'denied'
               ? 'Location denied. Navigate the map and click to drop a pin.'
-              : "Map centred on your position. Click anywhere to refine."}
+              : 'Map centred on your position. Click anywhere to refine.'}
           </p>
         </div>
+
         {/* GPS status pill */}
         <div className="shrink-0">
           {geoStatus === 'pending' && (
@@ -174,7 +185,6 @@ export default function Step2_LocationPin({ onNext, onBack }) {
           center={[center.lat, center.lng]}
           zoom={zoom}
           style={{ height: '100%', width: '100%' }}
-          ref={mapRef}
         >
           <TileLayer
             attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -197,10 +207,10 @@ export default function Step2_LocationPin({ onNext, onBack }) {
         </MapContainer>
       </div>
 
-      {/* Detected address row */}
+      {/* Address panel */}
       {pin && (
         <div className="mt-4 border border-gray-200 rounded-sm">
-          {/* Auto-detected row */}
+          {/* Detected address row */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide w-20 shrink-0">Detected</span>
             <span className="text-[11px] font-semibold text-gray-700 flex-1">
@@ -227,18 +237,23 @@ export default function Step2_LocationPin({ onNext, onBack }) {
             />
             {userAddress && <FiCheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
           </div>
+
+          {/* Use detected address button */}
+          {autoAddress && (
+            <div className="px-4 py-2.5 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleUseDetected}
+                className="w-full flex items-center justify-center gap-1.5 py-2 text-[10px] font-extrabold text-[#1e2a5a] bg-[#1e2a5a]/5 hover:bg-[#1e2a5a]/10 border border-[#1e2a5a]/15 rounded-sm transition cursor-pointer uppercase tracking-wider"
+              >
+                <FiCompass className="w-3 h-3" />
+                Use detected address
+              </button>
+            </div>
+          )}
         </div>
       )}
-      {pin && autoAddress && userAddress !== autoAddress && (
-        <button
-          type="button"
-          className="text-[10px] font-bold text-[#1e2a5a] hover:underline mt-1.5 cursor-pointer block"
-          onClick={handleUseDetected}
-        >
-          ↩ Use detected address
-        </button>
-      )}
-
+      {/* Navigation */}
       <div className="flex justify-between pt-5 mt-4 border-t border-gray-100">
         <button
           id="complaint-step2-back"

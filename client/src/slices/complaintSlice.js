@@ -20,6 +20,7 @@ const initialState = {
   // Rejection flow
   isRejected: false,
   rejectionReason: null,
+  short_id: null,
 };
 
 const MAX_IMAGES = 5;
@@ -58,6 +59,9 @@ const complaintSlice = createSlice({
     resetComplaint() {
       return initialState;
     },
+    setShortID(state , action) {
+      state.short_id = action.payload
+    }
   },
 });
 
@@ -70,6 +74,7 @@ export const {
   setAiResult,
   setRejected,
   resetComplaint,
+  setShortID,
 } = complaintSlice.actions;
 
 export default complaintSlice.reducer;

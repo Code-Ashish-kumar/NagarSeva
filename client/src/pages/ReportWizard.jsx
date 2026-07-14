@@ -14,6 +14,7 @@ import Step1_ImageCapture from '../components/complaint/Step1_ImageCapture';
 import Step2_LocationPin  from '../components/complaint/Step2_LocationPin';
 import Step3_Description  from '../components/complaint/Step3_Description';
 import Step4_ReviewForm   from '../components/complaint/Step4_ReviewForm';
+import Step5_submission_successfull from '../components/complaint/step5_submission_successfull';
 
 export default function ReportWizard() {
   const dispatch = useDispatch();
@@ -61,7 +62,8 @@ export default function ReportWizard() {
             {activeStep === 1 && <Step1_ImageCapture onNext={goNext} />}
             {activeStep === 2 && <Step2_LocationPin onNext={goNext} onBack={goBack} />}
             {activeStep === 3 && <Step3_Description onNext={goNext} onBack={goBack} />}
-            {activeStep === 4 && <Step4_ReviewForm onBack={goBack} onGoToStep={goToStep} />}
+            {activeStep === 4 && <Step4_ReviewForm onNext={goNext} onBack={goBack} onGoToStep={goToStep} />}
+            {activeStep === 5 && <Step5_submission_successfull/>}
           </div>
         </div>
       </div>

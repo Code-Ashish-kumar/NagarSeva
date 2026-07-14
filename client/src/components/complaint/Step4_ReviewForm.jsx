@@ -10,7 +10,7 @@
 import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { resetComplaint } from '../../slices/complaintSlice';
+import { resetComplaint , setShortID } from '../../slices/complaintSlice';
 import { apiConnector } from '../../services/apiConnector';
 import { endpoints } from '../../services/api';
 import {
@@ -93,7 +93,7 @@ function MergeNotification({ mergedIssue, onViewComplaints }) {
         </div>
       </div>
       <div>
-        <h2 className="text-base font-black text-gray-900">We've received your complaint!</h2>
+        <h2 className="font-black text-gray-900 text-[15px]">We've received your complaint!</h2>
         <p className="text-[11px] text-gray-500 font-semibold mt-2 max-w-xs mx-auto leading-relaxed">
           Your report was merged with existing tracked issue{' '}
           <strong className="text-[#1e2a5a]">#{mergedIssue?.issue?.short_id}</strong>.
@@ -112,18 +112,25 @@ function MergeNotification({ mergedIssue, onViewComplaints }) {
 }
 
 /* ─── Main review step ──────────────────────────────────────────── */
-export default function Step4_ReviewForm({ onBack, onGoToStep }) {
+export default function Step4_ReviewForm({ onNext , onBack, onGoToStep }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const { aiResult, images, location, description } =
     useSelector((s) => s.complaint);
 
-  const [submitting,  setSubmitting]  = useState(false);
-  const [error,       setError]       = useState(null);
-  const [mergedIssue, setMergedIssue] = useState(null);
+  const [submitting,        setSubmitting]        = useState(false);
+  const [error,             setError]             = useState(null);
+  const [mergedIssue,       setMergedIssue]       = useState(null);
+  const [submitted,         setSubmitted]         = useState(null); // { short_id }
+  // Tracks which description will be submitted: 'user' | 'ai'
+  const [descriptionSource, setDescriptionSource] = useState('user');
 
   if (!aiResult) return null;
+
+  const activeDescription = descriptionSource === 'ai'
+    ? aiResult.ai_description
+    : description;
 
   if (mergedIssue) {
     return (
@@ -136,6 +143,13 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
       />
     );
   }
+
+  // ── New issue successfully submitted ──────────────────────────────────────
+  // if (submitted) {
+  //   return (
+      
+  //   );
+  // }
 
   const confidencePct = Math.round((aiResult.confidence ?? 0) * 100);
 
@@ -166,7 +180,7 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
   async function handleSubmit() {
     setSubmitting(true);
     setError(null);
-
+  
     try {
       const sigData = await apiConnector('GET', endpoints.UPLOAD_SIGNATURE_API);
 
@@ -177,7 +191,7 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
       const result = await apiConnector('POST', endpoints.CREATE_ISSUE_API, {
         category:    aiResult.category   || 'OTHER',
         department:  aiResult.department || null,
-        description: description         || aiResult.ai_description,
+        description: activeDescription   || aiResult.ai_description,
         lat:         location.lat,
         lng:         location.lng,
         address:     location.address    || '',
@@ -187,8 +201,10 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
       if (result.merged) {
         setMergedIssue(result);
       } else {
-        dispatch(resetComplaint());
-        navigate('/citizen/complaints', { replace: true });
+        setSubmitted({ short_id: result.issue?.short_id });
+        dispatch(setShortID(result.issue?.short_id))
+
+        onNext()
       }
     } catch (err) {
       const message = err?.data?.message || err?.message || '';
@@ -202,7 +218,7 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
     <div>
       {/* Heading */}
       <div className="mb-5">
-        <h2 className="text-sm font-black text-gray-900 uppercase tracking-wide">Review Your Complaint</h2>
+        <h2 className="font-black text-gray-900 text-[15px] uppercase tracking-wide">Review Your Complaint</h2>
         <p className="text-[11px] text-gray-400 font-semibold mt-0.5">
           AI-filled. Hover any row and click <em>Edit</em> to change it.
         </p>
@@ -217,7 +233,7 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
             {images.map((img, idx) => (
               <img
                 key={idx}
-                className="w-10 h-10 rounded-sm object-cover border border-gray-200 flex-shrink-0"
+                className="w-10 h-10 rounded-sm object-cover border border-gray-200 shrink-0"
                 src={img.previewUrl}
                 alt={`Photo ${idx + 1}`}
               />
@@ -255,17 +271,66 @@ export default function Step4_ReviewForm({ onBack, onGoToStep }) {
 
         <ReviewRow label="AI Title" value={aiResult.title} stepIndex={3} />
 
+        {/* AI Description — shown with option to use it as the submitted description */}
+        {aiResult.ai_description && (
+          <div className="flex items-start gap-3 px-4 py-3 border-b border-gray-100">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide w-28 shrink-0 mt-0.5">
+              AI Description
+            </span>
+            <div className="flex-1 min-w-0 space-y-2">
+              <p className="text-[11px] font-semibold text-gray-700 leading-relaxed">
+                {aiResult.ai_description}
+              </p>
+              {descriptionSource === 'user' ? (
+                <button
+                  onClick={() => setDescriptionSource('ai')}
+                  className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#1e2a5a] bg-[#1e2a5a]/5 hover:bg-[#1e2a5a]/10 border border-[#1e2a5a]/15 px-2.5 py-1 rounded-sm transition cursor-pointer uppercase tracking-wide"
+                >
+                  Use AI description
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-sm uppercase tracking-wide">
+                  <FiCheckCircle className="w-3 h-3" /> Active
+                </span>
+              )}
+            </div>
+            <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+          </div>
+        )}
+
         <ReviewRow
           label="Location"
           value={location?.address || `${location?.lat?.toFixed(6)}, ${location?.lng?.toFixed(6)}`}
           stepIndex={2}
         />
 
-        <ReviewRow label="Your Description" stepIndex={3}>
-          <p className="text-[11px] font-semibold text-gray-700 leading-relaxed whitespace-pre-wrap">
-            {description}
-          </p>
-        </ReviewRow>
+        {/* Your Description — shows toggle back to user description when AI is active */}
+        <div className="flex items-start gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0 group">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide w-28 shrink-0 mt-0.5">
+            Your Description
+          </span>
+          <div className="flex-1 min-w-0 space-y-2">
+            <p className={`text-[11px] font-semibold leading-relaxed whitespace-pre-wrap ${descriptionSource === 'ai' ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+              {description || '—'}
+            </p>
+            {descriptionSource === 'ai' && (
+              <button
+                onClick={() => setDescriptionSource('user')}
+                className="inline-flex items-center gap-1 text-[10px] font-extrabold text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-200 px-2.5 py-1 rounded-sm transition cursor-pointer uppercase tracking-wide"
+              >
+                Use my description instead
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => onGoToStep(3)}
+            className="shrink-0 flex items-center gap-1 text-[9px] font-bold text-gray-300 hover:text-[#1e2a5a] opacity-0 group-hover:opacity-100 transition cursor-pointer"
+            title="Edit description"
+          >
+            <FiEdit2 className="w-3 h-3" /> Edit
+          </button>
+          <FiCheckCircle className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${descriptionSource === 'user' ? 'text-emerald-400' : 'text-gray-300'}`} />
+        </div>
 
       </div>
 

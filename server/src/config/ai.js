@@ -51,6 +51,14 @@ function buildPrompt(description, location, imageCount, departments) {
   // Build the department enum dynamically from the cached list
   const deptList = departments.map(d => `"${d}"`).join(', ');
 
+  // Static category enum — must match the category column CHECK constraint in the DB
+  const categoryList = [
+    'POTHOLE', 'STREETLIGHT', 'SEWAGE', 'GARBAGE', 'WATER_SUPPLY',
+    'ROAD_DAMAGE', 'ENCROACHMENT', 'STRAY_ANIMALS', 'DEAD_ANIMAL',
+    'PUBLIC_TOILET', 'DRAIN_BLOCKAGE', 'FALLEN_TREE', 'ABANDONED_VEHICLE',
+    'AIR_POLLUTION', 'OTHER',
+  ].map(c => `"${c}"`).join(', ');
+
   const systemPrompt = `You are an AI system for a civic issue reporting platform called NagarSeva, used in Indian cities. You analyse images of civic infrastructure problems and return structured JSON assessments.`;
 
   const userPrompt = `${imageNote}
@@ -63,12 +71,30 @@ Respond ONLY with a valid JSON object matching this exact schema — no markdown
 {
   "is_valid_civic_issue": <boolean — true if this is a real civic infrastructure problem visible in the image(s)>,
   "rejection_reason": <string if is_valid_civic_issue is false, otherwise null>,
+  "category": <one of: ${categoryList}>,
   "department": <one of: ${deptList}>,
   "confidence": <float 0.0-1.0 — how confident you are in the department assignment>,
   "severity": <one of: "LOW", "MEDIUM", "HIGH", "CRITICAL">,
   "title": <short 5-10 word title describing the specific issue>,
   "ai_description": <2-3 sentence factual description of what is visible in the image(s) and its civic impact>
 }
+
+Category assignment rules:
+- Choose the MOST specific category that matches what is visible in the image
+- POTHOLE / ROAD_DAMAGE: any road surface defect or damage
+- STREETLIGHT: broken, missing, or non-functional street lighting
+- SEWAGE: open drains, sewage overflow, blocked manholes
+- GARBAGE: uncollected waste, overflowing bins, illegal dumping
+- WATER_SUPPLY: broken pipes, water leakage, supply disruption
+- ENCROACHMENT: illegal occupation of public land or footpath
+- STRAY_ANIMALS: stray dogs, cattle, or other animals causing hazard
+- DEAD_ANIMAL: animal carcass requiring removal
+- PUBLIC_TOILET: damaged, unclean, or missing public toilet facilities
+- DRAIN_BLOCKAGE: blocked storm drains or waterlogging
+- FALLEN_TREE: fallen or dangerous trees blocking roads or paths
+- ABANDONED_VEHICLE: vehicles abandoned on public roads
+- AIR_POLLUTION: visible smoke, industrial pollution, burning waste
+- OTHER: only if none of the above categories fit
 
 Department assignment rules:
 - Choose the MOST relevant department based on what is visible in the image
@@ -105,7 +131,12 @@ async function callGroq(imageList, systemPrompt, userPrompt) {
       { role: 'user', content },
     ],
     temperature: 0.3,
-    max_completion_tokens: 1024,
+    max_completion_tokens: 4096,
+    // reasoning_format: 'hidden' strips <think> tokens before returning the
+    // response. Required for Qwen3 models — without it, reasoning tokens
+    // bleed into the output and corrupt json_object mode (400 json_validate_failed).
+    reasoning_format: 'hidden',
+    reasoning_effort: 'none',
     response_format: { type: 'json_object' },
   });
 

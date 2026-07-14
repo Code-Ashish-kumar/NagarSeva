@@ -11,6 +11,7 @@ const STEPS = [
   { id: 2, label: 'Pin Location' },
   { id: 3, label: 'Describe'    },
   { id: 4, label: 'Review'      },
+  { id: 5, label: 'Submitted' }
 ];
 
 export default function StepIndicator({ currentStep }) {
@@ -19,6 +20,8 @@ export default function StepIndicator({ currentStep }) {
       {STEPS.map((step, idx) => {
         const isCompleted = step.id < currentStep;
         const isActive    = step.id === currentStep;
+        
+        if(step.id === 5)return(<></>)
 
         return (
           <div key={step.id} className="flex items-center flex-1 last:flex-none">
