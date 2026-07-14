@@ -15,6 +15,7 @@ const {
   createDepartment,
   deleteDepartment,
   getStats,
+  getAnalytics,
   createStaff,
   getStaffList,
   resendCredentials,
@@ -28,6 +29,9 @@ router.use(auth, roleGuard('SUPER_ADMIN'));
 
 // Dashboard stats
 router.get('/stats', getStats);
+
+// Analytics (charts)
+router.get('/analytics', getAnalytics);
 
 // Triaging queue
 router.get('/queue', getTriagingQueue);

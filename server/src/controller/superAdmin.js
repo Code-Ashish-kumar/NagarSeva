@@ -369,9 +369,114 @@ const deleteDepartment = async (req, res) => {
 };
 
 /**
- * GET /api/super-admin/stats
- * Dashboard metrics for SuperAdmin.
+ * GET /api/super-admin/analytics
+ * Returns data for all 3 analytics charts in one round-trip.
+ *
+ * Query params:
+ *   period   — 'monthly' (default) | 'yearly'
+ *
+ * Response shape:
+ * {
+ *   line:  [{ period, received, resolved }]           — for the line chart
+ *   pie:   { total, verified, rejected, pending }     — for the pie chart
+ *   bar:   [{ department, count }]                    — for the bar chart
+ * }
  */
+const getAnalytics = async (req, res) => {
+  try {
+    const period = req.query.period === 'yearly' ? 'yearly' : 'monthly';
+
+    // ── Line chart: received vs resolved over time ────────────────────────────
+    const lineQuery = period === 'monthly'
+      ? `
+        SELECT
+          TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YYYY') AS period,
+          DATE_TRUNC('month', created_at)                       AS sort_key,
+          COUNT(*)                                              AS received,
+          COUNT(*) FILTER (WHERE status IN ('RESOLVED','CLOSED')) AS resolved
+        FROM issues
+        WHERE created_at >= NOW() - INTERVAL '12 months'
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY sort_key ASC
+      `
+      : `
+        SELECT
+          TO_CHAR(DATE_TRUNC('year', created_at), 'YYYY') AS period,
+          DATE_TRUNC('year', created_at)                   AS sort_key,
+          COUNT(*)                                          AS received,
+          COUNT(*) FILTER (WHERE status IN ('RESOLVED','CLOSED')) AS resolved
+        FROM issues
+        GROUP BY DATE_TRUNC('year', created_at)
+        ORDER BY sort_key ASC
+      `;
+
+    // ── Pie chart: verification breakdown (all time) ──────────────────────────
+    const pieQuery = `
+      SELECT
+        COUNT(*)                                                          AS total,
+        COUNT(*) FILTER (WHERE status = 'SUBMITTED')                     AS pending,
+        COUNT(*) FILTER (WHERE status IN ('VERIFIED', 'ASSIGNED',
+                                          'IN_PROGRESS', 'RESOLVED',
+                                          'NOT_SATISFIED', 'CLOSED'))    AS verified,
+        COUNT(*) FILTER (WHERE status = 'REJECTED')                      AS rejected
+      FROM issues
+    `;
+
+    // ── Bar chart: issues per department ─────────────────────────────────────
+    const barQuery = period === 'monthly'
+      ? `
+        SELECT
+          d.name                                             AS department,
+          COUNT(i.id)                                        AS count
+        FROM departments d
+        LEFT JOIN issues i
+          ON i.department_id = d.id
+         AND i.created_at >= NOW() - INTERVAL '1 month'
+        WHERE d.deleted_at IS NULL
+        GROUP BY d.name
+        ORDER BY count DESC
+      `
+      : `
+        SELECT
+          d.name           AS department,
+          COUNT(i.id)      AS count
+        FROM departments d
+        LEFT JOIN issues i
+          ON i.department_id = d.id
+         AND EXTRACT(YEAR FROM i.created_at) = EXTRACT(YEAR FROM NOW())
+        WHERE d.deleted_at IS NULL
+        GROUP BY d.name
+        ORDER BY count DESC
+      `;
+
+    const [lineRes, pieRes, barRes] = await Promise.all([
+      pool.query(lineQuery),
+      pool.query(pieQuery),
+      pool.query(barQuery),
+    ]);
+
+    res.status(200).json({
+      line: lineRes.rows.map(r => ({
+        period:   r.period,
+        received: parseInt(r.received),
+        resolved: parseInt(r.resolved),
+      })),
+      pie: {
+        total:    parseInt(pieRes.rows[0].total),
+        verified: parseInt(pieRes.rows[0].verified),
+        rejected: parseInt(pieRes.rows[0].rejected),
+        pending:  parseInt(pieRes.rows[0].pending),
+      },
+      bar: barRes.rows.map(r => ({
+        department: r.department,
+        count:      parseInt(r.count),
+      })),
+    });
+  } catch (err) {
+    console.error('[getAnalytics]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch analytics.' });
+  }
+};
 const getStats = async (req, res) => {
   try {
     const stats = await pool.query(`
@@ -777,6 +882,7 @@ module.exports = {
   createDepartment,
   deleteDepartment,
   getStats,
+  getAnalytics,
   createEmployee,
   getEmployees,
   getDesignationsConfig,

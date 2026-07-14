@@ -11,6 +11,7 @@ const {
   getRankedWorkers,
   assignWorker,
   getDeptStats,
+  getAdminAnalytics,
   getIssueDetailForAdmin,
   getWorkerIssues
 } = require('../controller/admin');
@@ -22,6 +23,9 @@ router.use(auth, roleGuard('ADMIN'));
 
 // Stats for this admin's department
 router.get('/stats', getDeptStats);
+
+// Analytics charts
+router.get('/analytics', getAdminAnalytics);
 
 // Issues assigned to this admin's department (pending allocation)
 router.get('/queue', getDepartmentQueue);

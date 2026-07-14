@@ -335,11 +335,112 @@ const getWorkerIssues = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/admin/analytics
+ * Department-scoped analytics for the Admin dashboard.
+ * Query params: period = 'monthly' (default) | 'yearly'
+ *
+ * Response:
+ * {
+ *   trend:      [{ period, received, resolved, not_satisfied }]
+ *   statusPie1: { in_progress, assigned }
+ *   statusPie2: { resolved, not_satisfied }
+ *   workers:    [{ name, in_progress, resolved, not_satisfied }]
+ * }
+ */
+const getAdminAnalytics = async (req, res) => {
+  try {
+    const dept_id = await getAdminDeptId(req);
+    if (!dept_id) {
+      return res.status(400).json({ error: 'NO_DEPARTMENT', message: 'No department assigned.' });
+    }
+
+    const period = req.query.period === 'yearly' ? 'yearly' : 'monthly';
+    const trunc  = period === 'monthly' ? 'month' : 'year';
+    const fmt    = period === 'monthly' ? 'Mon YYYY' : 'YYYY';
+    const since  = period === 'monthly' ? `NOW() - INTERVAL '12 months'` : `'2000-01-01'`;
+
+    // ── Chart 1: Issue trend over time ──────────────────────────────────────
+    const trendRes = await pool.query(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('${trunc}', created_at), '${fmt}') AS period,
+        DATE_TRUNC('${trunc}', created_at)                     AS sort_key,
+        COUNT(*)                                               AS received,
+        COUNT(*) FILTER (WHERE status IN ('RESOLVED','CLOSED')) AS resolved,
+        COUNT(*) FILTER (WHERE status = 'NOT_SATISFIED')        AS not_satisfied
+      FROM issues
+      WHERE department_id = $1
+        AND created_at >= ${since}
+      GROUP BY DATE_TRUNC('${trunc}', created_at)
+      ORDER BY sort_key ASC
+    `, [dept_id]);
+
+    // ── Chart 2a: In-Progress vs Assigned (current snapshot) ───────────────
+    const pie1Res = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'IN_PROGRESS') AS in_progress,
+        COUNT(*) FILTER (WHERE status = 'ASSIGNED')    AS assigned
+      FROM issues
+      WHERE department_id = $1
+    `, [dept_id]);
+
+    // ── Chart 2b: Resolved vs Not-Satisfied (all time) ──────────────────────
+    const pie2Res = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status IN ('RESOLVED','CLOSED')) AS resolved,
+        COUNT(*) FILTER (WHERE status = 'NOT_SATISFIED')        AS not_satisfied
+      FROM issues
+      WHERE department_id = $1
+    `, [dept_id]);
+
+    // ── Chart 4: Per-worker breakdown ───────────────────────────────────────
+    const workersRes = await pool.query(`
+      SELECT
+        u.name,
+        COUNT(i.id) FILTER (WHERE i.status = 'IN_PROGRESS')           AS in_progress,
+        COUNT(i.id) FILTER (WHERE i.status IN ('RESOLVED','CLOSED'))   AS resolved,
+        COUNT(i.id) FILTER (WHERE i.status = 'NOT_SATISFIED')          AS not_satisfied
+      FROM users u
+      LEFT JOIN issues i ON i.assigned_to = u.id AND i.department_id = $1
+      WHERE u.role = 'FIELD_WORKER' AND u.department_id = $1
+      GROUP BY u.id, u.name
+      ORDER BY u.name ASC
+    `, [dept_id]);
+
+    res.status(200).json({
+      trend: trendRes.rows.map(r => ({
+        period:        r.period,
+        received:      parseInt(r.received),
+        resolved:      parseInt(r.resolved),
+        not_satisfied: parseInt(r.not_satisfied),
+      })),
+      statusPie1: {
+        in_progress: parseInt(pie1Res.rows[0].in_progress),
+        assigned:    parseInt(pie1Res.rows[0].assigned),
+      },
+      statusPie2: {
+        resolved:      parseInt(pie2Res.rows[0].resolved),
+        not_satisfied: parseInt(pie2Res.rows[0].not_satisfied),
+      },
+      workers: workersRes.rows.map(r => ({
+        name:          r.name,
+        in_progress:   parseInt(r.in_progress),
+        resolved:      parseInt(r.resolved),
+        not_satisfied: parseInt(r.not_satisfied),
+      })),
+    });
+  } catch (err) {
+    console.error('[getAdminAnalytics]', err);
+    res.status(500).json({ error: 'SERVER_ERROR', message: 'Failed to fetch analytics.' });
+  }
+};
+
 module.exports = { 
   getDepartmentQueue, 
   getRankedWorkers, 
   assignWorker, 
-  getDeptStats, 
+  getDeptStats,
+  getAdminAnalytics,
   getIssueDetailForAdmin,
   getWorkerIssues
 };

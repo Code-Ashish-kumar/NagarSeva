@@ -28,6 +28,7 @@ export const endpoints = {
   UPLOAD_SIGNATURE_API:    BASE_URL + "/upload/signature",
   // SUPER ADMIN ENDPOINTS
   SA_STATS_API:            BASE_URL + "/super-admin/stats",
+  SA_ANALYTICS_API:        BASE_URL + "/super-admin/analytics",
   SA_QUEUE_API:            BASE_URL + "/super-admin/queue",
   SA_ISSUE_DETAIL_API:     (id) => BASE_URL + "/super-admin/issues/" + id + "/detail",
   SA_VERIFY_API:           (id) => BASE_URL + "/super-admin/issues/" + id + "/verify",
@@ -37,6 +38,7 @@ export const endpoints = {
   SA_STAFF_API:            BASE_URL + "/super-admin/staff",
   // ADMIN ENDPOINTS
   ADMIN_STATS_API:         BASE_URL + "/admin/stats",
+  ADMIN_ANALYTICS_API:     BASE_URL + "/admin/analytics",
   ADMIN_QUEUE_API:         BASE_URL + "/admin/queue",
   ADMIN_WORKERS_API:       BASE_URL + "/admin/workers",
   ADMIN_WORKER_ISSUES_API: (workerId) => BASE_URL + "/admin/workers/" + workerId + "/issues",

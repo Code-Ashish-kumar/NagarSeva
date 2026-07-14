@@ -25,9 +25,11 @@ import Landing from "./pages/Landing";
 import Admin_Home from "./pages/Admin_Home";
 import Admin_Reports from "./pages/Admin_Reports";
 import Admin_FieldWorkers from "./pages/Admin_FieldWorkers";
+import Admin_Analytics from "./pages/Admin_Analytics";
 import SuperAdmin_Home from "./pages/SuperAdmin_Home";
 import SuperAdmin_Reports from "./pages/SuperAdmin_Reports";
 import SuperAdmin_Departments from "./pages/SuperAdmin_Departments";
+import SuperAdmin_Analytics from "./pages/SuperAdmin_Analytics";
 
 
 export default function App() {
@@ -119,6 +121,14 @@ export default function App() {
         }
       />
       <Route
+        path="/admin/analytics"
+        element={
+          <ProtectedRoute roles={["ADMIN"]}>
+            <Admin_Analytics />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/superadmin"
         element={
           <ProtectedRoute roles={["SUPER_ADMIN"]}>
@@ -139,6 +149,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={["SUPER_ADMIN"]}>
             <SuperAdmin_Departments />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin/analytics"
+        element={
+          <ProtectedRoute roles={["SUPER_ADMIN"]}>
+            <SuperAdmin_Analytics />
           </ProtectedRoute>
         }
       />
