@@ -1,4 +1,5 @@
-const BASE_URL = "/api";
+const API_HOST = import.meta.env.VITE_API_URL || '';
+const BASE_URL = API_HOST + "/api";
 
 // AUTH ENDPOINTS
 export const endpoints = {

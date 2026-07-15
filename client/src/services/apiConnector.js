@@ -1,18 +1,13 @@
 /**
  * Generic API connector using native fetch.
  * All requests include credentials (cookies) for httpOnly JWT support.
- *
- * In production, VITE_API_URL points to the Render backend.
- * In development, the Vite proxy handles /api → localhost:5000.
  */
-const API_BASE = import.meta.env.VITE_API_URL || '';
-
 export const apiConnector = async (method, url, bodyData = null, headers = null, params = null) => {
-  let finalUrl = API_BASE + url;
+  let finalUrl = url;
 
   if (params) {
     const queryString = new URLSearchParams(params).toString();
-    finalUrl = `${url}?${queryString}`;
+    finalUrl = `${finalUrl}?${queryString}`;
   }
 
   const config = {
