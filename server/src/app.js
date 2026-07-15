@@ -15,6 +15,7 @@ const fieldWorkerRoutes = require('./routes/fieldWorker');
 const app = express();
 
 // ─── Security & Parsing ───────────────────────────────────────────────────────
+app.set('trust proxy', 1);  // Trust first proxy (Render/Vercel load balancer)
 app.use(helmet());
 app.use(cors({
   origin: function (origin, callback) {
